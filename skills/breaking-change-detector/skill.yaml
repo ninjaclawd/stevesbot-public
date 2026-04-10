@@ -1,0 +1,96 @@
+type: declarative
+id: breaking-change-detector
+name: Breaking Change Detector
+description: >
+  After daily repo updates, scan recent diffs for API and config breaking changes
+  that could affect users of VDO.Ninja, Social Stream Ninja, and related tools.
+schedule: "0 5 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: vdo_ninja_diff
+    type: shell
+    command: >
+      ROOT=${STEVESBOT_ROOT:-.} &&
+      cd "$ROOT/repos/vdo.ninja" &&
+      git diff HEAD~5..HEAD -- '*.js' '*.ts' '*.json' '*.yaml' '*.yml' 2>/dev/null |
+      grep -E '^\-.*export |^\-.*function |^\-.*config|^\+.*export |^\+.*function |^\+.*config|^diff --git' |
+      head -200 || echo "No relevant changes"
+  - id: social_stream_diff
+    type: shell
+    command: >
+      ROOT=${STEVESBOT_ROOT:-.} &&
+      cd "$ROOT/repos/social_stream" &&
+      git diff HEAD~5..HEAD -- '*.js' '*.ts' '*.json' '*.yaml' '*.yml' 2>/dev/null |
+      grep -E '^\-.*export |^\-.*function |^\-.*config|^\+.*export |^\+.*function |^\+.*config|^diff --git' |
+      head -200 || echo "No relevant changes"
+  - id: ssn_app_diff
+    type: shell
+    command: >
+      ROOT=${STEVESBOT_ROOT:-.} &&
+      cd "$ROOT/repos/ssn_app" &&
+      git diff HEAD~5..HEAD -- '*.js' '*.ts' '*.json' '*.yaml' '*.yml' 2>/dev/null |
+      grep -E '^\-.*export |^\-.*function |^\-.*config|^\+.*export |^\+.*function |^\+.*config|^diff --git' |
+      head -200 || echo "No relevant changes"
+  - id: raspberry_ninja_diff
+    type: shell
+    command: >
+      ROOT=${STEVESBOT_ROOT:-.} &&
+      cd "$ROOT/repos/raspberry_ninja" &&
+      git diff HEAD~5..HEAD -- '*.py' '*.js' '*.json' '*.yaml' '*.yml' 2>/dev/null |
+      grep -E '^\-.*export |^\-.*def |^\-.*config|^\+.*export |^\+.*def |^\+.*config|^diff --git' |
+      head -200 || echo "No relevant changes"
+  - id: electroncapture_diff
+    type: shell
+    command: >
+      ROOT=${STEVESBOT_ROOT:-.} &&
+      cd "$ROOT/repos/electroncapture" &&
+      git diff HEAD~5..HEAD -- '*.js' '*.ts' '*.json' '*.yaml' '*.yml' 2>/dev/null |
+      grep -E '^\-.*export |^\-.*function |^\-.*config|^\+.*export |^\+.*function |^\+.*config|^diff --git' |
+      head -200 || echo "No relevant changes"
+
+prompt_template: |
+  You are StevesBot's breaking change analyst. Review the recent diffs from Steve's
+  project repositories and identify any changes that could break existing users.
+
+  Focus on:
+  - Removed or renamed exports/functions
+  - Changed function signatures (added required params, changed return types)
+  - Renamed or removed config keys
+  - Changed default values that alter behavior
+  - Removed API endpoints or URL parameters
+
+  Recent diffs by repo:
+
+  **VDO.Ninja:**
+  {{vdo_ninja_diff}}
+
+  **Social Stream Ninja:**
+  {{social_stream_diff}}
+
+  **SSN Desktop App:**
+  {{ssn_app_diff}}
+
+  **Raspberry Ninja:**
+  {{raspberry_ninja_diff}}
+
+  **ElectronCapture:**
+  {{electroncapture_diff}}
+
+  Format your response as:
+  **Breaking Change Report — {{date}}**
+
+  For each potential breaking change found:
+  - **Repo:** [name]
+  - **File:** [path]
+  - **Change:** [what changed]
+  - **Impact:** [who/what could break]
+  - **Severity:** Critical / Warning / Info
+
+  If no breaking changes are detected, say so clearly.
+  Ignore sections that say "No relevant changes" or "[missing:...]".
+  End with a summary count: X critical, Y warnings, Z info.
+
+output_format: text
+report_to: review_channel

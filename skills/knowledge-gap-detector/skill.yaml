@@ -1,0 +1,65 @@
+type: declarative
+id: knowledge-gap-detector
+name: Knowledge Gap Detector
+description: >
+  Find questions users asked that had no KB matches or resulted in rejected/ungrounded drafts.
+  These represent knowledge gaps that need new KB articles or learnings.
+schedule: "0 10 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: ungrounded_rejections
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT route_id, author_name, message_content,
+        json_extract(review_json, '$.policyFlags') as flags
+      FROM workflow_runs
+      WHERE outcome = 'rejected'
+        AND created_at >= datetime('now', '-7 days')
+        AND (json_extract(review_json, '$.policyFlags') LIKE '%invented_evidence%'
+             OR json_extract(review_json, '$.policyFlags') LIKE '%grounding%')
+      ORDER BY created_at DESC
+      LIMIT 15
+  - id: hold_with_questions
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT route_id, author_name, message_content
+      FROM workflow_runs
+      WHERE outcome = 'hold'
+        AND created_at >= datetime('now', '-7 days')
+        AND json_extract(triage_json, '$.directAsk') = 1
+      ORDER BY created_at DESC
+      LIMIT 15
+  - id: top_kb_categories
+    type: sql
+    db: knowledge
+    query: >
+      SELECT category, COUNT(*) as cnt
+      FROM mined_threads
+      GROUP BY category
+      ORDER BY cnt DESC
+      LIMIT 10
+
+prompt_template: |
+  You are analyzing support gaps. Below are two evidence sets:
+  1. Questions rejected because the bot invented evidence or lacked grounding
+  2. Direct asks that were held because the bot could not answer confidently
+
+  {{data}}
+
+  Identify up to 4 knowledge gaps only when the evidence is strong.
+
+  Rules:
+  - Require repeated evidence across multiple examples when possible; do not invent a "gap" from a single vague message.
+  - Prefer concrete product gaps over generic status-follow-up or workflow chatter.
+  - If the KB likely has the topic but the bot failed to ground correctly, call it a grounding/search issue instead of a missing article.
+  - For each item, include: Gap, Evidence, and the exact KB/doc addition or retrieval fix that would help.
+  - If there are no clear repeated gaps, say "No strong new knowledge gaps detected."
+
+  Keep it under 220 words.
+
+output_format: text
+report_to: review_channel

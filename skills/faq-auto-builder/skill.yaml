@@ -1,0 +1,90 @@
+type: declarative
+id: faq-auto-builder
+name: FAQ Auto-Builder
+description: >
+  Monitor repeated questions from the last 7 days, extract Q&A pairs,
+  and propose new FAQ entries to reduce repetitive support load.
+schedule: "0 11 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: repeated_questions
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT
+        LOWER(TRIM(SUBSTR(REPLACE(REPLACE(message_content, CHAR(10), ' '), CHAR(13), ' '), 1, 90))) AS opener,
+        COUNT(*) AS cnt,
+        GROUP_CONCAT(DISTINCT route_id) AS routes,
+        GROUP_CONCAT(DISTINCT SUBSTR(REPLACE(REPLACE(TRIM(message_content), CHAR(10), ' '), CHAR(13), ' '), 1, 220)) AS sample_messages
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+        AND author_id != '111111111111111111'
+        AND COALESCE(json_extract(triage_json, '$.directAsk'), 0) = 1
+        AND LENGTH(TRIM(message_content)) >= 12
+        AND COALESCE(json_extract(triage_json, '$.category'), '') NOT IN (
+          'maintainer-message',
+          'human-handling-no-ask',
+          'acknowledgement',
+          'status_update',
+          'status_update_with_evidence',
+          'status_update_with_gratitude',
+          'support_thread_status',
+          'thread_status',
+          'workflow_status'
+        )
+      GROUP BY opener
+      HAVING cnt >= 2
+      ORDER BY cnt DESC, opener
+      LIMIT 20
+  - id: existing_kb_size
+    type: sql
+    db: knowledge
+    query: >
+      SELECT COUNT(*) AS total_entries FROM mined_threads
+  - id: recently_resolved
+    type: sql
+    db: knowledge
+    query: >
+      SELECT thread_name, solution, products_json, category
+      FROM mined_threads
+      WHERE resolved=1 AND LENGTH(solution)>30
+      ORDER BY indexed_at DESC LIMIT 10
+
+prompt_template: |
+  You are StevesBot's FAQ curator for Steve Seguin's streaming tools.
+
+  PRODUCT KNOWLEDGE (use correct terminology):
+  - VDO.Ninja — browser-based WebRTC tool (web app, NOT a standalone app). URL params: &push, &view, &room, &bitrate, &codec, &relay, &director, etc.
+  - Social Stream Ninja (SSN) — chat aggregator. Chrome EXTENSION (primary) + STANDALONE DESKTOP APP (Electron). Captures from YouTube, Twitch, Kick, TikTok, Facebook, etc.
+  - Electron Capture — desktop app for clean browser source capture in OBS.
+  - Raspberry Ninja — headless WebRTC camera tool (publish.py, GStreamer, Raspberry Pi/Jetson).
+
+  RECENTLY RESOLVED ISSUES (don't propose stale FAQs for things that were just fixed):
+  {{recently_resolved}}
+
+  REPEATED NEAR-DUPLICATE USER ASKS (last 7 days):
+  {{repeated_questions}}
+
+  Current KB size: {{existing_kb_size}} entries.
+
+  These rows are already near-duplicate question openers. Propose FAQ entries only for topics that appear at least 3 times and have a grounded, stable answer.
+
+  For each accepted cluster, propose a FAQ entry:
+  ### [Category] (asked X times)
+  **Q:** [Clear question using correct product names]
+  **A:** [Accurate, specific answer grounded in the resolved issues above or stable product knowledge. Include URL params, settings, or steps where applicable. If recently fixed, say so.]
+  **Priority:** High / Medium / Low
+
+  RULES:
+  - Use correct product names. VDO.Ninja is a web app. SSN has the desktop/standalone app.
+  - Do not build FAQs from triage labels like maintainer-message or status updates.
+  - If a question was about a bug that's now fixed, say it was fixed and avoid outdated workaround language.
+  - Skip topics when the answer is uncertain, version-specific, or depends on maintainer confirmation.
+  - If all candidates are weak, sparse, or not yet answerable, output exactly: "No strong new FAQ candidates today."
+
+  Date: {{date}}
+
+output_format: text
+report_to: review_channel

@@ -1,0 +1,23 @@
+areas:
+  - id: route-instructions
+    label: Route Instructions
+    purpose: Per-channel behavior, tone, and support boundaries.
+    readableScopes:
+      - resources/instructions
+    typicalContent: Markdown instructions and support policy.
+    usageGuidance: Read these before drafting or reviewing replies.
+  - id: repos
+    label: Repositories
+    purpose: Product source trees and docs for code-aware answers.
+    readableScopes:
+      - repos
+    typicalContent: Source files, READMEs, and project docs.
+    usageGuidance: Search narrowly and only within configured repo scopes.
+  - id: historical-support
+    label: Historical Support
+    purpose: Local support records and transcript archives.
+    readableScopes:
+      - data/sqlite
+      - data/transcripts
+    typicalContent: Structured support records and raw transcript archives.
+    usageGuidance: Query structured support first, then inspect transcripts when needed.

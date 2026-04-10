@@ -1,0 +1,122 @@
+type: declarative
+id: draft-failure-analyzer
+name: Draft Failure Analyzer
+description: >
+  Reviews rejected drafts and no-reply outcomes from user-requested-bot-help flows
+  to identify instruction gaps, missing knowledge, and harness issues.
+  Proposes specific instruction file edits. Runs weekly on Wednesdays at 10am.
+schedule: "0 10 * * 3"
+uses_llm: true
+model_preference: local-qwen
+report_to: review_channel
+
+data_queries:
+  - id: rejected_user_requested
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT wr.id, wr.route_id, wr.message_content, wr.reply_text,
+        json_extract(wr.triage_json, '$.category') as triage_category,
+        json_extract(wr.review_json, '$.issues') as review_issues,
+        json_extract(wr.review_json, '$.policyFlags') as policy_flags
+      FROM workflow_runs wr
+      WHERE wr.outcome = 'rejected'
+        AND wr.created_at >= datetime('now', '-7 days')
+        AND json_extract(wr.triage_json, '$.category') = 'user-requested-bot-help'
+      ORDER BY wr.created_at DESC
+      LIMIT 15
+
+  - id: rejected_with_draft
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT wr.id, wr.route_id, wr.message_content,
+        json_extract(wr.review_json, '$.issues') as review_issues,
+        json_extract(wr.review_json, '$.policyFlags') as policy_flags
+      FROM workflow_runs wr
+      WHERE wr.outcome = 'rejected'
+        AND wr.reply_text IS NULL
+        AND wr.created_at >= datetime('now', '-7 days')
+      ORDER BY wr.created_at DESC
+      LIMIT 10
+
+  - id: no_answer_drafts
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT wr.id, wr.route_id, wr.message_content, wr.reply_text
+      FROM workflow_runs wr
+      WHERE wr.outcome = 'approved'
+        AND wr.reply_text LIKE '%could not find%'
+        AND wr.created_at >= datetime('now', '-7 days')
+      ORDER BY wr.created_at DESC
+      LIMIT 10
+
+  - id: tool_usage_patterns
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT ws.label, COUNT(*) as cnt,
+        SUM(CASE WHEN ws.status = 'error' THEN 1 ELSE 0 END) as errors
+      FROM workflow_steps ws
+      WHERE ws.phase = 'tool'
+        AND ws.run_id IN (
+          SELECT id FROM workflow_runs
+          WHERE created_at >= datetime('now', '-7 days')
+            AND outcome IN ('approved', 'rejected')
+        )
+      GROUP BY ws.label
+      ORDER BY cnt DESC
+
+  - id: empty_search_results
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT ws.run_id, ws.label, ws.input_text
+      FROM workflow_steps ws
+      WHERE ws.phase = 'tool'
+        AND ws.output_text IN ('[]', 'No matching entries found in knowledge base.', 'No results found.')
+        AND ws.run_id IN (
+          SELECT id FROM workflow_runs
+          WHERE created_at >= datetime('now', '-7 days')
+            AND outcome IN ('approved', 'rejected')
+        )
+      ORDER BY ws.run_id DESC
+      LIMIT 20
+
+prompt_template: |
+  You are analyzing the stevesbot support pipeline to find instruction gaps and harness issues.
+
+  Your job: identify WHY drafts failed or produced weak answers, and propose specific improvements to prevent the same failures.
+
+  REJECTED DRAFTS (user explicitly asked for help but got no answer):
+  {{rejected_user_requested}}
+
+  OTHER REJECTED DRAFTS:
+  {{rejected_with_draft}}
+
+  "COULD NOT FIND" ANSWERS (bot admitted ignorance — were they really unfindable?):
+  {{no_answer_drafts}}
+
+  TOOL USAGE PATTERNS (which tools are used, which error):
+  {{tool_usage_patterns}}
+
+  EMPTY SEARCH RESULTS (searches that found nothing — bad queries?):
+  {{empty_search_results}}
+
+  ANALYSIS TASKS:
+  1. For each rejected draft: Was the rejection correct? Or did the reviewer wrongly reject a good answer?
+  2. For each "could not find" answer: Was the info truly missing, or did the drafter search with wrong terms?
+  3. Are there patterns in empty searches? (e.g., always missing the same parameter docs, same product area)
+  4. Are there tool usage anti-patterns? (e.g., never using findRepoFiles, searching with overly specific queries)
+
+  OUTPUT:
+  - Top 3 instruction file improvements (be specific: which file, what to add/change)
+  - Top 3 drafter behavior issues (what the model is doing wrong and how to fix)
+  - Any reviewer issues (wrongly rejecting good drafts)
+
+  Keep it actionable. No vague suggestions.
+
+  Date: {{date}}
+
+output_format: text

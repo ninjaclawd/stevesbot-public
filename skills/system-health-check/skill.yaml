@@ -1,0 +1,15 @@
+type: script
+id: system-health-check
+name: System Health Check
+description: >
+  Produce a deterministic infrastructure health report for StevesBot.
+  Checks service state, disk, memory, VPN/Discord reachability, local Qwen,
+  queue health, KB sync, and recent workflow outcomes without using an LLM.
+schedule: "*/30 * * * *"
+interpreter: node
+entrypoint: ../../scripts/health-check.cjs
+args:
+  - --chore-report
+env: {}
+timeout: 30000
+report_to: review_channel

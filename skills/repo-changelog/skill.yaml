@@ -1,0 +1,51 @@
+type: declarative
+id: repo-changelog
+name: Repo Changelog
+description: >
+  After daily repo updates, summarize new commits across all tracked repos.
+  Helps Steve stay aware of changes without checking each repo manually.
+schedule: "30 4 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: vdo_ninja_log
+    type: shell
+    command: "cd repos/vdo-ninja && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+  - id: social_stream_log
+    type: shell
+    command: "cd repos/social_stream && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+  - id: ssn_app_log
+    type: shell
+    command: "cd repos/ssn_app && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+  - id: raspberry_ninja_log
+    type: shell
+    command: "cd repos/raspberry_ninja && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+  - id: captionninja_log
+    type: shell
+    command: "cd repos/captionninja && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+  - id: electroncapture_log
+    type: shell
+    command: "cd repos/electroncapture && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+  - id: comms_cam_log
+    type: shell
+    command: "cd repos/comms.cam && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+  - id: invite_cam_log
+    type: shell
+    command: "cd repos/invite.cam && git log --oneline --since='25 hours ago' 2>/dev/null | head -10 || echo 'no new commits'"
+
+prompt_template: |
+  Summarize the repo changes from the last 24 hours. Only mention repos that have new commits.
+
+  {{data}}
+
+  If no repos have changes, just say "No repo changes in the last 24 hours."
+  Otherwise, for each repo with changes:
+  - Repo name
+  - Number of commits
+  - Brief summary of what changed (group related commits)
+
+  Keep it under 150 words. Skip repos with no commits.
+
+output_format: text
+report_to: review_channel

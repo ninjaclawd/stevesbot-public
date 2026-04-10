@@ -1,0 +1,15 @@
+type: script
+id: captcha-bypass
+name: CAPTCHA Bypass
+description: >
+  Human-like web interaction using kernel-level uinput for undetectable input.
+  Supports mouse movement (Bezier curves), keyboard input, and vision-based
+  CAPTCHA solving (Turnstile, reCAPTCHA, hCaptcha).
+schedule: ""
+interpreter: python3
+entrypoint: vision_solver.py
+args: []
+env:
+  DISPLAY: ":0"
+timeout: 120000
+report_to: review_channel

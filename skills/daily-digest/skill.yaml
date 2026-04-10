@@ -1,0 +1,93 @@
+type: declarative
+id: daily-digest
+name: Daily Digest
+description: >
+  Produce a daily summary of bot activity, key metrics,
+  and anything that needs Steve's attention.
+schedule: "0 20 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: today_runs
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT outcome, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-24 hours')
+      GROUP BY outcome
+  - id: today_replies
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT route_id, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-24 hours')
+        AND outcome = 'replied'
+      GROUP BY route_id
+  - id: draft_usage
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT usage, COUNT(*) as cnt
+      FROM draft_usage
+      WHERE created_at >= datetime('now', '-24 hours')
+      GROUP BY usage
+  - id: feedback
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT rating, COUNT(*) as cnt
+      FROM run_feedback
+      WHERE created_at >= datetime('now', '-24 hours')
+      GROUP BY rating
+  - id: new_users
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT COUNT(DISTINCT author_id) as cnt
+      FROM user_memory
+      WHERE first_seen_at >= datetime('now', '-24 hours')
+  - id: score_summary
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT COALESCE(SUM(points), 0) as today_points,
+        COUNT(DISTINCT event_type) as event_types
+      FROM score_log
+      WHERE created_at >= datetime('now', '-24 hours')
+  - id: score_breakdown
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT event_type, SUM(points) as pts, COUNT(*) as cnt
+      FROM score_log
+      WHERE created_at >= datetime('now', '-24 hours')
+      GROUP BY event_type ORDER BY pts DESC LIMIT 5
+  - id: active_users
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT COUNT(DISTINCT author_id) as cnt
+      FROM user_memory
+      WHERE last_seen_at >= datetime('now', '-24 hours')
+
+prompt_template: |
+  You are StevesBot's daily reporter. Produce a concise end-of-day summary for Steve.
+
+  Today's data:
+  {{data}}
+
+  Format:
+  **Daily Digest — {{date}}**
+  - Pipeline: X runs (Y replied, Z held, W ignored)
+  - Draft acceptance: X used, Y modified, Z skipped
+  - Users: X active, Y new
+  - Feedback: X good, Y bad
+  - Score: X points from Y event types (top: list top 3)
+  - Notable: (anything unusual or worth attention)
+  - Action items: (only if something needs Steve's input)
+
+output_format: text
+report_to: review_channel

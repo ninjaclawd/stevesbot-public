@@ -1,0 +1,119 @@
+type: declarative
+id: sentiment-monitor
+name: Sentiment Monitor
+description: >
+  Scan recent Discord messages for frustration signals and flag users
+  who may need human attention from Steve.
+schedule: "0 */4 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: frustration_messages
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT
+        author_id,
+        author_name,
+        route_id,
+        SUBSTR(message_content, 1, 300) AS message_excerpt,
+        created_at
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-4 hours')
+        AND (
+          LOWER(message_content) LIKE '%help%'
+          OR LOWER(message_content) LIKE '%broken%'
+          OR LOWER(message_content) LIKE '%not working%'
+          OR LOWER(message_content) LIKE '%bug%'
+          OR LOWER(message_content) LIKE '%crash%'
+          OR LOWER(message_content) LIKE '%frustrated%'
+          OR LOWER(message_content) LIKE '%angry%'
+          OR LOWER(message_content) LIKE '%urgent%'
+        )
+      ORDER BY created_at DESC
+      LIMIT 50
+  - id: frustration_by_route
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT
+        route_id,
+        COUNT(*) AS cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-4 hours')
+        AND (
+          LOWER(message_content) LIKE '%help%'
+          OR LOWER(message_content) LIKE '%broken%'
+          OR LOWER(message_content) LIKE '%not working%'
+          OR LOWER(message_content) LIKE '%bug%'
+          OR LOWER(message_content) LIKE '%crash%'
+          OR LOWER(message_content) LIKE '%frustrated%'
+          OR LOWER(message_content) LIKE '%angry%'
+          OR LOWER(message_content) LIKE '%urgent%'
+        )
+      GROUP BY route_id
+      ORDER BY cnt DESC
+  - id: frustration_by_author
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT
+        author_id,
+        author_name,
+        COUNT(*) AS msg_count
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-4 hours')
+        AND (
+          LOWER(message_content) LIKE '%help%'
+          OR LOWER(message_content) LIKE '%broken%'
+          OR LOWER(message_content) LIKE '%not working%'
+          OR LOWER(message_content) LIKE '%bug%'
+          OR LOWER(message_content) LIKE '%crash%'
+          OR LOWER(message_content) LIKE '%frustrated%'
+          OR LOWER(message_content) LIKE '%angry%'
+          OR LOWER(message_content) LIKE '%urgent%'
+        )
+      GROUP BY author_id
+      ORDER BY msg_count DESC
+      LIMIT 10
+
+prompt_template: |
+  You are StevesBot's sentiment analyst. Review recent Discord messages that contain
+  frustration signals and determine if any users need immediate human attention.
+
+  Important: Not every message containing "help" or "bug" is negative. Use context
+  to distinguish genuine frustration from normal support questions. Focus on:
+  - Repeated messages from the same user (escalating frustration)
+  - Strong negative language (angry, frustrated, urgent)
+  - Reports of things being broken or crashing
+  - Users who seem stuck and aren't getting resolution
+
+  Messages with frustration keywords (last 4 hours):
+  {{frustration_messages}}
+
+  Frustration signals by channel:
+  {{frustration_by_route}}
+
+  Frustration signals by user:
+  {{frustration_by_author}}
+
+  Format your response as:
+  **Sentiment Monitor — {{date}}**
+
+  **Flagged Users (need human attention):**
+  For each flagged user:
+  - **User:** [name] (ID: [id])
+  - **Channel:** [route]
+  - **Concern:** [brief description of the issue]
+  - **Urgency:** High / Medium / Low
+
+  **Channel Summary:**
+  - [channel]: X frustration signals
+
+  **Overall Assessment:** [1-2 sentence summary]
+
+  If no users need attention, say "All clear — no users flagged for escalation."
+
+output_format: text
+report_to: review_channel

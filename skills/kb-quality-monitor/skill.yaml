@@ -1,0 +1,94 @@
+type: declarative
+id: kb-quality-monitor
+name: KB Quality Monitor
+description: >
+  Track knowledge base health: weak entries, coverage gaps, keyword density,
+  resolution rates by category. Alerts when quality degrades.
+schedule: "0 11 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: total_entries
+    type: sql
+    db: knowledge
+    query: >
+      SELECT COUNT(*) as total,
+        SUM(CASE WHEN resolved=1 THEN 1 ELSE 0 END) as resolved,
+        SUM(CASE WHEN LENGTH(COALESCE(solution,'')) < 20 THEN 1 ELSE 0 END) as weak_solution,
+        SUM(CASE WHEN LENGTH(summary) < 80 THEN 1 ELSE 0 END) as weak_summary,
+        SUM(CASE WHEN LENGTH(COALESCE(keywords_json,'[]')) < 30 THEN 1 ELSE 0 END) as weak_keywords
+      FROM mined_threads
+
+  - id: category_coverage
+    type: sql
+    db: knowledge
+    query: >
+      SELECT category, COUNT(*) as total,
+        SUM(CASE WHEN resolved=1 THEN 1 ELSE 0 END) as resolved,
+        ROUND(100.0 * SUM(CASE WHEN resolved=1 THEN 1 ELSE 0 END) / COUNT(*), 1) as resolve_pct
+      FROM mined_threads
+      GROUP BY category ORDER BY total DESC
+
+  - id: recent_additions
+    type: sql
+    db: knowledge
+    query: >
+      SELECT COUNT(*) as added_last_7d FROM mined_threads
+      WHERE indexed_at >= datetime('now', '-7 days')
+
+  - id: archive_coverage
+    type: sql
+    db: archive
+    query: >
+      SELECT COUNT(DISTINCT thread_id) as total_archive_threads
+      FROM archived_messages
+      WHERE thread_id IS NOT NULL
+
+  - id: newest_indexed_entries
+    type: sql
+    db: knowledge
+    query: >
+      SELECT thread_id, indexed_at
+      FROM mined_threads
+      ORDER BY indexed_at DESC
+      LIMIT 5
+
+  - id: mining_chore_state
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT id, enabled, last_status, last_run_at,
+        substr(COALESCE(last_result, ''), 1, 180) as last_result
+      FROM chores
+      WHERE id IN ('auto-mine', 'weekly-kb-mining', 'monthly-kb-refresh')
+      ORDER BY id
+
+prompt_template: |
+  You are monitoring the StevesBot knowledge base health. Analyze the data and produce a quality report.
+
+  {{data}}
+
+  Format:
+  **KB Quality Report — {{date}}**
+  - Total entries / resolution rate
+  - Weak entries needing enrichment (short summaries, missing solutions, few keywords)
+  - Coverage: mined vs unmined threads
+  - Recent growth (last 7 days)
+  - Category breakdown with resolution rates
+  - Action items (only if quality is degrading or coverage is low)
+
+  For the Coverage line:
+  - mined count = total_entries[0].total
+  - archive total = archive_coverage[0].total_archive_threads
+  - unmined = archive total - mined count
+  - coverage % = mined count / archive total
+
+  If recent_additions is zero, inspect newest_indexed_entries and mining_chore_state before calling it a pipeline issue.
+  If auto-mine or weekly-kb-mining are disabled, say mining is currently disabled/paused instead of implying the pipeline is broken.
+  If monthly-kb-refresh shows an execution error, call that out directly with the evidence from mining_chore_state.
+  Flag WARNING if: weak entries > 20% of total, or resolution rate < 50%, or coverage < 70%.
+  Only call it a pipeline or metrics issue when a query actually failed. Do not claim DB corruption unless the data explicitly says corruption or integrity-check failure.
+
+output_format: text
+report_to: review_channel

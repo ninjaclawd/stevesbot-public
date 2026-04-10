@@ -1,0 +1,14 @@
+type: script
+id: monthly-kb-refresh
+name: Monthly KB Refresh (OpenCode)
+description: >
+  Regenerates product reference docs, FAQ, unresolved analysis, and pipeline
+  analysis using GPT-5.4-pro. These docs feed into the drafter's context.
+  Runs first Sunday of each month at 3pm EST (after weekly mining).
+schedule: "0 15 1-7 * 0"
+interpreter: /bin/bash
+entrypoint: run.sh
+args: []
+env: {}
+timeout: 3600000
+report_to: review_channel

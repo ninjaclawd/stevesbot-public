@@ -1,0 +1,14 @@
+type: script
+id: weekly-kb-mining
+name: Weekly KB Mining (OpenCode)
+description: >
+  Launches a conservative weekly OpenCode mining pass for unmined Discord threads.
+  Uses small default limits and enrichment, with deep analysis disabled unless
+  explicitly opted in via environment variables.
+schedule: "0 14 * * 0"
+interpreter: /bin/bash
+entrypoint: run.sh
+args: []
+env: {}
+timeout: 7200000
+report_to: review_channel

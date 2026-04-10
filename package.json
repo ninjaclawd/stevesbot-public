@@ -1,0 +1,27 @@
+{
+  "name": "stevesbot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "repo-smoke": "tsx scripts/repo-smoke.ts",
+    "validate-skills": "tsx scripts/validate-skills.ts",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "@roamhq/wrtc": "^0.10.0",
+    "@vdoninja/sdk": "^1.3.18",
+    "better-sqlite3": "^11.10.0",
+    "discord.js": "^14.18.0",
+    "ws": "^8.20.0",
+    "yaml": "^2.8.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

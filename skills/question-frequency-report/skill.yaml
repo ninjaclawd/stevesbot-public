@@ -1,0 +1,89 @@
+type: declarative
+id: question-frequency-report
+name: Question Frequency Report
+description: >
+  Track most-asked question categories over the past week, compare to the
+  previous week, and highlight trends for Steve.
+schedule: "0 9 * * 1"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: this_week_categories
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT
+        json_extract(triage_json, '$.category') AS category,
+        COUNT(*) AS cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+        AND json_extract(triage_json, '$.category') IS NOT NULL
+      GROUP BY category
+      ORDER BY cnt DESC
+      LIMIT 25
+  - id: prev_week_categories
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT
+        json_extract(triage_json, '$.category') AS category,
+        COUNT(*) AS cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-14 days')
+        AND created_at < datetime('now', '-7 days')
+        AND json_extract(triage_json, '$.category') IS NOT NULL
+      GROUP BY category
+      ORDER BY cnt DESC
+      LIMIT 25
+  - id: total_questions_this_week
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT COUNT(*) AS total
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+  - id: total_questions_prev_week
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT COUNT(*) AS total
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-14 days')
+        AND created_at < datetime('now', '-7 days')
+
+prompt_template: |
+  You are StevesBot's analytics reporter. Analyze question frequency data and
+  produce a clear weekly trends report for Steve.
+
+  This week's question categories (last 7 days):
+  {{this_week_categories}}
+
+  Previous week's categories (7-14 days ago):
+  {{prev_week_categories}}
+
+  Total questions this week: {{total_questions_this_week}}
+  Total questions previous week: {{total_questions_prev_week}}
+
+  Format your response as:
+  **Question Frequency Report — Week of {{date}}**
+
+  **Top Categories This Week:**
+  Rank each category with count and week-over-week change (up/down/new/unchanged).
+
+  **Trending Up:** (categories with significant increases)
+  **Trending Down:** (categories with significant decreases)
+  **New This Week:** (categories not seen last week)
+
+  **Volume Summary:**
+  - This week: X total questions
+  - Previous week: Y total questions
+  - Change: +/-Z (N%)
+
+  **Insights:** (2-3 sentences about what the trends suggest — new features causing
+  confusion? Recurring issues that need documentation? Seasonal patterns?)
+
+  **Recommendations:** (actionable suggestions for Steve based on the data)
+
+output_format: text
+report_to: review_channel

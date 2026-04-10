@@ -1,0 +1,40 @@
+reviewChannel:
+  guildId: "222222222222222222"
+  channelId: "333333333333333333"
+  enabled: false
+routes:
+  - id: vdo-ninja-support
+    guildId: "444444444444444444"
+    channelId: "555555555555555555"
+    mode: thread
+    instructionRef: resources/instructions/vdo-ninja-support.md
+    repoScopes:
+      - vdo-ninja
+      - comms-cam
+      - invite-cam
+      - game-capture
+      - ninja-obs-plugin
+    enabled: false
+  - id: social-stream-support
+    guildId: "444444444444444444"
+    channelId: "666666666666666666"
+    mode: thread
+    instructionRef: resources/instructions/social-stream-support.md
+    repoScopes:
+      - social-stream
+      - ssn-app
+      - caption-ninja
+      - electron-capture
+    enabled: false
+  - id: vdo-ninja-bug-report
+    guildId: "444444444444444444"
+    channelId: "777777777777777777"
+    mode: channel
+    instructionRef: resources/instructions/vdo-ninja-bug-report.md
+    repoScopes:
+      - vdo-ninja
+      - ssn-app
+      - social-stream
+      - comms-cam
+      - invite-cam
+    enabled: false

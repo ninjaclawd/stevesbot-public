@@ -1,0 +1,14 @@
+type: script
+id: vision-analyzer
+name: Vision Analyzer
+description: >
+  Analyze images and screenshots using the local RTX 5090 vision model (Qwen3.5).
+  Supports general analysis, coordinate detection, ROI cropping, and batch verification.
+schedule: ""
+interpreter: python3
+entrypoint: analyze.py
+args: []
+env:
+  DISPLAY: ":0"
+timeout: 120000
+report_to: review_channel

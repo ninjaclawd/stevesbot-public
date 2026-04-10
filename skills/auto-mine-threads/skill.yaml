@@ -1,0 +1,28 @@
+type: declarative
+id: auto-mine-threads
+name: Auto Mine Threads
+description: >
+  Launch a mining batch in the background and report KB status.
+  Mining runs asynchronously via local Qwen.
+schedule: "0 3 * * *"
+uses_llm: false
+model_preference: local-qwen
+
+data_queries:
+  - id: mined_count
+    type: sql
+    db: knowledge
+    query: >
+      SELECT COUNT(*) as mined FROM mined_threads
+  - id: run_mining
+    type: shell
+    command: "ROOT=${STEVESBOT_ROOT:-.}; cd \"$ROOT\" && NODE_BIN=${STEVESBOT_NODE:-$(command -v node 2>/dev/null || true)}; TSX_LOADER=${STEVESBOT_TSX_LOADER:-$ROOT/node_modules/tsx/dist/loader.mjs}; LIMIT=${AUTO_MINE_LIMIT:-10}; if [ -z \"$NODE_BIN\" ]; then echo \"No Node runtime available.\"; exit 127; fi; if [ ! -f \"$TSX_LOADER\" ]; then echo \"Missing tsx loader at $TSX_LOADER.\"; exit 1; fi; if [ \"${AUTO_MINE_DRY_RUN:-0}\" = \"1\" ]; then echo \"Dry run: would launch mining batch (limit $LIMIT).\"; else setsid -f \"$NODE_BIN\" --import \"file://$TSX_LOADER\" src/mine-discord-threads.ts --limit \"$LIMIT\" >> logs/mine-threads.log 2>&1 < /dev/null && echo \"Mining batch launched (limit $LIMIT). Check logs/mine-threads.log for progress.\"; fi"
+  - id: archive_threads
+    type: sql
+    db: archive
+    query: >
+      SELECT COUNT(DISTINCT thread_id) as total_threads FROM archived_messages WHERE thread_id IS NOT NULL
+
+prompt_template: "{{data}}"
+output_format: text
+report_to: review_channel

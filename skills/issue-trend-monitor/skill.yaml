@@ -1,0 +1,69 @@
+type: declarative
+id: issue-trend-monitor
+name: Issue Trend Monitor
+description: >
+  Detect spikes in support categories vs baseline.
+schedule: "0 9 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: recent_7d
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT outcome, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+      GROUP BY outcome ORDER BY cnt DESC
+  - id: top_categories
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT json_extract(triage_json, '$.category') as cat, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days') AND triage_json IS NOT NULL
+      GROUP BY cat ORDER BY cnt DESC LIMIT 8
+  - id: repeat_askers
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT author_name,
+        COUNT(*) as cnt,
+        SUM(CASE WHEN outcome IN ('hold', 'rejected', 'error') THEN 1 ELSE 0 END) as unresolvedish
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+        AND author_id != '111111111111111111'
+        AND (
+          json_extract(triage_json, '$.directAsk') = 1
+          OR outcome IN ('approved', 'hold', 'rejected', 'error')
+        )
+      GROUP BY author_id
+      HAVING cnt >= 3
+      ORDER BY unresolvedish DESC, cnt DESC
+      LIMIT 5
+  - id: rejection_reasons
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT json_extract(review_json, '$.policyFlags') as flags, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE outcome = 'rejected' AND created_at >= datetime('now', '-7 days')
+      GROUP BY flags ORDER BY cnt DESC LIMIT 5
+
+prompt_template: |
+  Analyze this week's support data. Flag only unusual or actionable items for Steve.
+
+  {{data}}
+
+  Rules:
+  - Treat high no-reply volume as expected when maintainer-message, human-handling-no-ask, or acknowledgement dominate.
+  - Escalate no-reply only if user-requested-bot-help, technical categories, holds, rejects, or errors are rising.
+  - Only flag repeat askers when unresolvedish is high; active users alone are not a problem.
+  - Do not recommend generic "check logs" or "review user_memory" unless the data clearly points there.
+  - If nothing stands out, say so plainly.
+
+  Format: 3-5 bullet points, under 140 words total.
+
+output_format: text
+report_to: review_channel

@@ -1,0 +1,370 @@
+# Skills Catalog
+
+# Each skill has: id, name, category, description, status (active/available/planned),
+# requirements (what it needs to run), schedule (if automated)
+
+skills:
+  # ── ACTIVE (currently running) ──
+  - id: system-health-check
+    name: System Health Check
+    category: monitoring
+    description: >-
+      Checks Orange Pi infrastructure health: disk, memory, systemd service, VPN connectivity,
+      Qwen reachability, KB sync, queue state, DB sizes, and workflow run outcomes.
+      Triggers every 30 minutes. Uses deterministic thresholds and recent fast-path context
+      to avoid noisy false positives in the review channel.
+    status: active
+    schedule: "*/30 * * * *"
+    requirements: [shell, db]
+
+  - id: issue-trend-monitor
+    name: Issue Trend Monitor
+    category: reporting
+    description: >-
+      Analyzes 7-day support data to find category spikes, repeat askers (3+ questions), and top rejection reasons.
+      Triggers daily at 9 AM. Outputs actionable bullet points flagging anything unusual for Steve.
+    status: active
+    schedule: "0 9 * * *"
+    requirements: [db, llm]
+
+  - id: knowledge-gap-detector
+    name: Knowledge Gap Detector
+    category: knowledge
+    description: >-
+      Queries rejected drafts (invented_evidence/grounding flags) and held direct-asks from the past 7 days
+      to identify topics the KB doesn't cover. Triggers daily at 10 AM.
+      Outputs top 3-5 knowledge gaps with specific KB article suggestions.
+    status: active
+    schedule: "0 10 * * *"
+    requirements: [db, llm]
+
+  - id: auto-mine-threads
+    name: Auto Mine Threads
+    category: knowledge
+    description: >-
+      Launches a background mining batch of 25 unmined Discord archive threads via local Qwen,
+      extracting solutions and product knowledge into mined_threads KB.
+      Triggers daily at 3 AM. Reports mined count and archive totals to review channel.
+    status: available
+    schedule: "0 3 * * *"
+    requirements: [db, llm, shell]
+
+  - id: repo-changelog
+    name: Repo Changelog
+    category: reporting
+    description: >-
+      Runs git log on all 8 tracked repos (VDO.Ninja, SSN, Raspberry Ninja, etc.) for the past 25 hours
+      and summarizes new commits per repo. Triggers daily at 4:30 AM after repo pulls.
+      Outputs grouped commit summaries so Steve doesn't have to check each repo.
+    status: active
+    schedule: "30 4 * * *"
+    requirements: [shell, llm]
+
+  - id: daily-digest
+    name: Daily Digest
+    category: reporting
+    description: >-
+      Produces end-of-day summary: pipeline run counts by outcome, draft acceptance rates,
+      active/new users, feedback ratings, score points, and notable events.
+      Triggers daily at 8 PM. Outputs formatted digest with action items if anything needs Steve's input.
+    status: active
+    schedule: "0 20 * * *"
+    requirements: [db, llm]
+
+  - id: monthly-kb-refresh
+    name: Monthly KB Refresh (OpenCode)
+    category: knowledge
+    description: >-
+      Rebuilds higher-level knowledge artifacts, unresolved analysis, and refreshed support docs
+      on the first Sunday of the month. Feeds the drafter with a cleaner monthly baseline.
+    status: active
+    schedule: "0 15 1-7 * 0"
+    requirements: [shell, llm]
+
+  - id: weekly-summary
+    name: Weekly Summary
+    category: reporting
+    description: >-
+      Generates 7-day overview: pipeline performance, busiest routes/categories, draft quality,
+      user trends, KB growth, guardrail catches, and top 3 action items.
+      Triggers Sundays at 6 PM. Outputs Discord-formatted report under 400 words.
+    status: available
+    schedule: "0 18 * * 0"
+    requirements: [db, llm]
+
+  # ── AVAILABLE (can be enabled) ──
+  - id: github-issue-watcher
+    name: GitHub Issue Watcher
+    category: monitoring
+    description: >-
+      Polls GitHub Issues and PRs across tracked repos every 2 hours for new activity matching keywords.
+      Posts matching updates to Discord. Use when Steve wants real-time awareness of GitHub activity without checking manually.
+    status: available
+    schedule: "0 */2 * * *"
+    requirements: [internet, shell]
+
+  - id: faq-auto-builder
+    name: FAQ Auto-Builder
+    category: knowledge
+    description: >-
+      Identifies questions asked 3+ times in the past week, extracts generalized Q&A pairs, and proposes
+      new FAQ entries for review. Triggers daily at 11 AM. Outputs candidate FAQ entries to review channel.
+    status: active
+    schedule: "0 11 * * *"
+    requirements: [db, llm]
+
+  - id: weekly-kb-mining
+    name: Weekly KB Mining (OpenCode)
+    category: knowledge
+    description: >-
+      Launches the heavier weekly KB mining and enrichment pass using OpenCode credits.
+      Intended for manual enablement when a larger Sunday refresh is worth the spend.
+    status: available
+    schedule: "0 14 * * 0"
+    requirements: [shell, llm]
+
+  - id: conversation-summarizer
+    name: Conversation Summarizer
+    category: knowledge
+    description: >-
+      Finds long Discord threads (10+ messages) and condenses them into short digests preserving key
+      decisions and solutions. Triggers daily at 10 PM. Outputs thread summaries for KB ingestion.
+    status: available
+    schedule: "0 22 * * *"
+    requirements: [db, llm]
+
+  - id: sentiment-monitor
+    name: Sentiment Monitor
+    category: user-tracking
+    description: >-
+      Scans recent Discord messages for frustration signals (repeated questions, negative keywords, escalation patterns).
+      Triggers every 4 hours. Alerts Steve in review channel when users appear stuck or unhappy.
+    status: available
+    schedule: "0 */4 * * *"
+    requirements: [db]
+
+  - id: stale-issue-reporter
+    name: Stale Issue Reporter
+    category: project-management
+    description: >-
+      Queries GitHub for open issues with no activity in 30+ days across all tracked repos.
+      Triggers Mondays at 9 AM. Outputs a triage list so Steve can close, update, or re-prioritize stale issues.
+    status: available
+    schedule: "0 9 * * 1"
+    requirements: [internet, shell]
+
+  - id: breaking-change-detector
+    name: Breaking Change Detector
+    category: code-analysis
+    description: >-
+      Analyzes recent git diffs for API signature changes, removed URL parameters, config format changes,
+      or renamed functions that could break existing users. Triggers daily at 5 AM.
+      Outputs a list of potentially breaking changes with affected files and risk level.
+    status: active
+    schedule: "0 5 * * *"
+    requirements: [shell, llm]
+
+  - id: reminder-scheduler
+    name: Reminder Scheduler
+    category: project-management
+    description: >-
+      Lets Steve create timed reminders via the command channel (e.g., "remind me to merge PR #42 Friday").
+      Checks every 5 minutes for due reminders. Delivers reminder messages to the command channel when triggered.
+    status: available
+    schedule: "*/5 * * * *"
+    requirements: [db]
+
+  - id: question-frequency-report
+    name: Question Frequency Report
+    category: reporting
+    description: >-
+      Ranks the most frequently asked questions from the past week with exact counts and categories.
+      Triggers Mondays at 9 AM. Outputs a ranked list revealing documentation gaps and common pain points.
+    status: active
+    schedule: "0 9 * * 1"
+    requirements: [db, llm]
+
+  - id: dependency-vulnerability-scanner
+    name: Dependency Vulnerability Scanner
+    category: monitoring
+    description: >-
+      Runs npm audit on all 8 tracked repos and reports new or critical vulnerabilities.
+      Triggers Mondays at 6 AM. Outputs vulnerability counts per repo with severity levels.
+    status: available
+    schedule: "0 6 * * 1"
+    requirements: [shell, internet]
+
+  - id: repeat-questioner-tracker
+    name: Repeat Questioner Tracker
+    category: user-tracking
+    description: >-
+      Identifies users who asked semantically similar questions multiple times in the past week,
+      suggesting they may need direct help or a better resource. Triggers daily at noon.
+      Outputs user list with question patterns and suggested targeted responses.
+    status: available
+    schedule: "0 12 * * *"
+    requirements: [db, llm]
+
+  - id: todo-extractor
+    name: TODO/FIXME Extractor
+    category: code-analysis
+    description: >-
+      Scans all tracked repos for TODO, FIXME, and HACK comments with file paths and line numbers.
+      Triggers Mondays at 5 AM. Maintains a living list so Steve can track and prioritize tech debt.
+    status: available
+    schedule: "0 5 * * 1"
+    requirements: [shell]
+
+  - id: pr-summary-generator
+    name: PR Summary Generator
+    category: code-analysis
+    description: >-
+      Generates plain-English summaries of open pull requests, explaining what changed and why.
+      Triggered on-demand (no schedule). Outputs readable PR descriptions for faster code review.
+    status: available
+    schedule: null
+    requirements: [internet, llm]
+
+  - id: onboarding-greeter
+    name: Onboarding Greeter
+    category: user-tracking
+    description: >-
+      Sends a welcome message to new Discord server members with links to docs, FAQ, and getting-started guides.
+      Triggered on member join (no schedule). Reduces "where do I start?" questions from newcomers.
+    status: available
+    schedule: null
+    requirements: [internet]
+
+  - id: health-check-pinger
+    name: External Health Pinger
+    category: monitoring
+    description: >-
+      Pings VDO.Ninja relay servers, TURN servers, and public APIs every 10 minutes to detect downtime.
+      Alerts Steve in review channel when any endpoint is unreachable so he can respond before users report it.
+    status: available
+    schedule: "*/10 * * * *"
+    requirements: [internet, shell]
+
+  - id: dead-code-finder
+    name: Dead Code Finder
+    category: code-analysis
+    description: >-
+      Scans tracked repos for unused exports, orphaned files, and unreachable code paths.
+      Triggers Sundays at 5 AM. Outputs a cleanup list to reduce codebase complexity.
+    status: available
+    schedule: "0 5 * * 0"
+    requirements: [shell]
+
+  - id: test-coverage-tracker
+    name: Test Coverage Tracker
+    category: code-analysis
+    description: >-
+      Runs the test suite and records coverage percentage over time.
+      Triggers daily at 5 AM. Alerts Steve if coverage drops below the previous baseline.
+    status: available
+    schedule: "0 5 * * *"
+    requirements: [shell]
+
+  - id: issue-deduplicator
+    name: Issue Deduplicator
+    category: project-management
+    description: >-
+      Checks newly opened GitHub issues against existing open issues using semantic similarity.
+      Triggered on-demand (no schedule). Suggests linking duplicates or closing with a reference to the original.
+    status: available
+    schedule: null
+    requirements: [internet, llm]
+
+  - id: milestone-tracker
+    name: Milestone Tracker
+    category: project-management
+    description: >-
+      Tracks open/closed issue counts for GitHub milestones and calculates completion percentage.
+      Triggers Mondays at 9 AM. Posts progress updates so Steve can see which milestones are on track.
+    status: available
+    schedule: "0 9 * * 1"
+    requirements: [internet]
+
+  - id: rss-feed-monitor
+    name: RSS Feed Monitor
+    category: monitoring
+    description: >-
+      Watches RSS feeds for Chrome/Firefox changelogs, WebRTC spec updates, and competitor product changes
+      that could affect VDO.Ninja or SSN. Triggers daily at 8 AM. Posts relevant updates to review channel.
+    status: available
+    schedule: "0 8 * * *"
+    requirements: [internet]
+
+  - id: snippet-library
+    name: Snippet Library
+    category: knowledge
+    description: >-
+      Maintains a searchable DB of reusable code snippets, URL parameter examples, and config templates
+      for VDO.Ninja, SSN, and other tools. No schedule (on-demand). Used by the drafter to include
+      exact code examples in support replies.
+    status: available
+    schedule: null
+    requirements: [db]
+
+  - id: auto-learn-from-approvals
+    name: Auto-Learn from Approvals
+    category: knowledge
+    description: >-
+      Extracts generalized Q&A pairs from bot replies that were approved and rated positively in the past 7 days.
+      Cross-checks against product context and recently resolved issues to avoid outdated answers.
+      Triggers daily at 9 PM. Outputs candidate Q&A entries for review channel.
+    status: available
+    schedule: "0 21 * * *"
+    requirements: [db, llm]
+
+  - id: draft-failure-analyzer
+    name: Draft Failure Analyzer
+    category: reporting
+    description: >-
+      Audits rejected drafts and no-reply outcomes from explicit bot-help flows to find harness,
+      instruction, and knowledge failures before they repeat.
+    status: available
+    schedule: "0 10 * * 3"
+    requirements: [db, llm]
+
+  - id: clarify-tool
+    name: Clarify Tool (Drafter)
+    category: user-tracking
+    description: >-
+      Allows the drafter LLM to ask users clarifying questions instead of guessing when key info is missing
+      (e.g., browser, OS, VDO.Ninja version). Reduces fabricated answers. Enable via STEVESBOT_ENABLE_CLARIFY=true.
+      No schedule (inline during drafting).
+    status: available
+    schedule: null
+    requirements: [llm]
+
+  - id: no-answer-tool
+    name: No-Answer Tool (Drafter)
+    category: user-tracking
+    description: >-
+      Allows the drafter LLM to explicitly respond "I don't know" when no KB match exists,
+      instead of fabricating an answer. Reduces hallucination. Enable via STEVESBOT_ENABLE_NO_ANSWER=true.
+      No schedule (inline during drafting).
+    status: available
+    schedule: null
+    requirements: [llm]
+
+categories:
+  - id: monitoring
+    label: Monitoring & Alerting
+    icon: shield
+  - id: reporting
+    label: Reporting & Analytics
+    icon: chart
+  - id: knowledge
+    label: Knowledge Management
+    icon: book
+  - id: code-analysis
+    label: Code Analysis
+    icon: code
+  - id: user-tracking
+    label: User Tracking & Support
+    icon: users
+  - id: project-management
+    label: Project Management
+    icon: clipboard

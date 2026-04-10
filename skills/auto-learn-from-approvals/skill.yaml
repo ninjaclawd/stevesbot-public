@@ -1,0 +1,71 @@
+type: declarative
+id: auto-learn-from-approvals
+name: Auto-Learn from Approvals
+description: >
+  Extract Q&A patterns from recently approved bot replies.
+  Cross-references with existing KB to avoid duplicates and outdated info.
+  Uses full product context to ensure accuracy.
+schedule: "0 21 * * *"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: approved_with_feedback
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT wr.id, wr.route_id, wr.message_content, wr.reply_text,
+        json_extract(wr.triage_json, '$.category') as category
+      FROM workflow_runs wr
+      LEFT JOIN run_feedback rf ON rf.run_id = wr.id
+      WHERE wr.outcome = 'approved'
+        AND wr.reply_text IS NOT NULL
+        AND wr.created_at >= datetime('now', '-7 days')
+        AND (rf.rating = 'good' OR rf.run_id IS NOT NULL)
+      ORDER BY wr.created_at DESC
+      LIMIT 10
+  - id: existing_faq_count
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT COUNT(*) as cnt FROM qa_entries
+  - id: recent_resolved_threads
+    type: sql
+    db: knowledge
+    query: >
+      SELECT thread_name, summary, solution, products_json, category
+      FROM mined_threads
+      WHERE indexed_at >= datetime('now', '-14 days') AND resolved=1
+      ORDER BY indexed_at DESC LIMIT 15
+
+prompt_template: |
+  You are extracting Q&A pairs from approved bot replies for Steve Seguin's streaming tools.
+
+  CRITICAL PRODUCT KNOWLEDGE — get these right or the Q&A is useless:
+  - VDO.Ninja (vdo.ninja) — BROWSER-BASED WebRTC tool. NOT a standalone app. It IS a web app accessed via browser. It has a native mobile app (iOS/Android), an OBS plugin, a VST plugin, and a Game Capture app, but the main product is the website. URL parameters like &push, &view, &room, &bitrate, &codec control behavior.
+  - Social Stream Ninja (SSN) — Chat overlay aggregator. Has TWO forms: a Chrome EXTENSION (primary) and a STANDALONE DESKTOP APP (Electron-based). "Standalone mode" means the desktop app vs the extension. Captures chat from YouTube, Twitch, Kick, TikTok, Facebook, etc.
+  - Electron Capture — Separate app for clean window capture in OBS.
+  - Raspberry Ninja — Python tool (publish.py) for headless WebRTC cameras on Raspberry Pi/Jetson.
+  - Caption Ninja — Browser-based speech-to-text captioning.
+
+  RECENTLY RESOLVED ISSUES (so you don't say "no fix available" for things that were fixed):
+  {{recent_resolved_threads}}
+
+  APPROVED BOT REPLIES TO EXTRACT FROM:
+  {{data}}
+
+  For each approved reply, extract a Q&A pair:
+  **Q:** [the question pattern — generalize from the specific case]
+  **A:** [accurate answer using correct product terminology. Cross-check against the product knowledge above. If the approved reply contained an error or outdated info, CORRECT IT based on the recently resolved threads.]
+  **Category:** [category]
+
+  RULES:
+  - Do NOT say "VDO.Ninja standalone app" — VDO.Ninja is a web app. SSN has the standalone/desktop app.
+  - If an issue was recently fixed (see resolved threads above), say it's fixed and what changed.
+  - Skip Q&A pairs that are too vague or where you aren't confident the answer is currently accurate.
+  - Keep answers under 80 words, specific and actionable.
+
+  Date: {{date}}
+
+output_format: text
+report_to: review_channel

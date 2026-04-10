@@ -1,0 +1,104 @@
+type: declarative
+id: weekly-summary
+name: Weekly Summary
+description: >
+  Comprehensive weekly summary for Steve covering pipeline performance,
+  user trends, KB growth, and action items.
+schedule: "0 18 * * 0"
+uses_llm: true
+model_preference: local-qwen
+
+data_queries:
+  - id: pipeline_week
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT outcome, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+      GROUP BY outcome ORDER BY cnt DESC
+  - id: top_categories
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT json_extract(triage_json, '$.category') as cat, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+        AND triage_json IS NOT NULL
+      GROUP BY cat ORDER BY cnt DESC LIMIT 5
+  - id: busiest_routes
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT route_id, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+      GROUP BY route_id ORDER BY cnt DESC
+  - id: feedback
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT rating, COUNT(*) as cnt
+      FROM run_feedback
+      WHERE created_at >= datetime('now', '-7 days')
+      GROUP BY rating
+  - id: draft_usage
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT usage, COUNT(*) as cnt
+      FROM draft_usage
+      WHERE created_at >= datetime('now', '-7 days')
+      GROUP BY usage
+  - id: new_users
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT COUNT(*) as cnt FROM user_memory
+      WHERE first_seen_at >= datetime('now', '-7 days')
+  - id: repeat_askers
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT author_name, COUNT(*) as cnt
+      FROM workflow_runs
+      WHERE created_at >= datetime('now', '-7 days')
+        AND author_id != '111111111111111111'
+        AND json_extract(triage_json, '$.category') != 'maintainer-message'
+      GROUP BY author_id HAVING cnt >= 3
+      ORDER BY cnt DESC LIMIT 5
+  - id: kb_growth
+    type: sql
+    db: knowledge
+    query: >
+      SELECT COUNT(*) as total FROM mined_threads
+  - id: guardrails
+    type: sql
+    db: stevesbot
+    query: >
+      SELECT label, COUNT(*) as cnt FROM workflow_steps
+      WHERE label LIKE '%fast-path%' OR label LIKE '%guardrail%'
+      GROUP BY label ORDER BY cnt DESC
+
+prompt_template: |
+  Produce a weekly summary report for Steve (the maintainer).
+
+  Data from the last 7 days:
+  {{data}}
+
+  Format as a Discord-friendly message:
+  **Weekly Summary — {{date}}**
+
+  Sections:
+  1. Pipeline overview (total runs, approved, rejected, held)
+  2. Busiest routes and top categories
+  3. Draft quality (approval rate, feedback, draft usage)
+  4. User activity (new users, repeat askers needing attention)
+  5. KB coverage (total mined, growth)
+  6. Guardrail effectiveness (what got caught)
+  7. Top 3 action items for the week ahead
+
+  Keep it under 400 words. Be specific with numbers.
+
+output_format: text
+report_to: review_channel
