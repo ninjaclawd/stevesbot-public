@@ -51,7 +51,7 @@ data_queries:
       head -200 || echo "No relevant changes"
 
 prompt_template: |
-  You are StevesBot's breaking change analyst. Review the recent diffs from Steve's
+  You are the support bot's breaking change analyst. Review the recent diffs from the configured
   project repositories and identify any changes that could break existing users.
 
   Focus on:

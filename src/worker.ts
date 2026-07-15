@@ -179,7 +179,7 @@ export class WorkflowQueueWorker {
             durationMs: 0,
           });
         } else {
-          // Normal flow — send to review channel for Steve to approve
+          // Normal flow — send to the review channel for a maintainer to approve.
           const startedAt = Date.now();
           try {
             const delivery = await this.publisher.publish(route, job.event, result.reply, result.runId, result.draftType);

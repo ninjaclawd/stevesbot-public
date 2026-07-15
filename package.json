@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
     "repo-smoke": "tsx scripts/repo-smoke.ts",
+    "repo-sync": "bash scripts/update-repos.sh",
     "validate-skills": "tsx scripts/validate-skills.ts",
     "test": "tsx --test tests/**/*.test.ts"
   },

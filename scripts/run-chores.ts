@@ -6,13 +6,14 @@
  */
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-import { appendFileSync, statSync, unlinkSync, writeFileSync as writeFileSyncFs } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { extractSystemHealthStatus, shouldPostSystemHealthAlert } from "../src/chore-alerts.js";
 import { AppDatabase } from "../src/store/database.js";
 import { loadAllSkills, executeSkill, shouldRunNow, postChoreResultToDiscord } from "../src/chore-runner.js";
 import { initScoring, scoreChoreCompleted } from "../src/scoring.js";
 import { buildTfidfIndex } from "../src/tfidf-search.js";
 import { registerMissingDefaultChores } from "../src/chore-definitions.js";
+import { acquireChoreLock, releaseChoreLock } from "../src/chore-lock.js";
 
 const ROOT = path.resolve(process.env.STEVESBOT_ROOT ?? ".");
 const LOG = path.join(ROOT, "logs", "chore-runner.log");
@@ -24,25 +25,18 @@ function log(msg: string): void {
 }
 
 async function main(): Promise<void> {
-  // Prevent concurrent executions (cron can overlap if a run takes > 10min)
+  // Prevent concurrent executions. A lock belongs to a live PID rather than an
+  // arbitrary timeout, so a healthy long-running knowledge job is not duplicated.
   const lockPath = path.join(ROOT, "logs", "chore-runner.lock");
-  try {
-    const lockStat = statSync(lockPath);
-    const lockAge = Date.now() - lockStat.mtimeMs;
-    if (lockAge < 10 * 60_000) {
-      log("Another chore runner is active (lock age: " + Math.round(lockAge / 1000) + "s). Exiting.");
-      return;
-    }
-    // Stale lock (> 10 min old), remove it
-    unlinkSync(lockPath);
-  } catch {
-    // No lock file exists — proceed
+  const lock = acquireChoreLock(lockPath);
+  if (!lock.acquired) {
+    log("Another chore runner is active" + (lock.ownerPid ? ` (PID ${lock.ownerPid})` : "") + ". Exiting.");
+    return;
   }
-  writeFileSyncFs(lockPath, process.pid.toString());
   try {
     await runChores();
   } finally {
-    try { unlinkSync(lockPath); } catch { /* ok */ }
+    releaseChoreLock(lockPath);
   }
 }
 

@@ -156,13 +156,13 @@ async function main(): Promise<void> {
     });
 
     const openCodeClient = new OpenAiCompatJsonClient({
-      baseUrl: process.env.OPENCODE_BASE_URL ?? "https://api.opencode.ai/v1",
+      baseUrl: process.env.OPENCODE_BASE_URL ?? "https://opencode.ai/zen/go/v1",
       apiKey: process.env.OPENCODE_API_KEY,
-      model: process.env.OPENCODE_MODEL ?? "gpt-5.4-pro",
-      systemRoleLabel: "You are GPT-5.4 acting as a repo-aware support answer drafter with read-only tools.",
-      clientLabel: "gpt-drafter",
+      model: process.env.OPENCODE_MODEL ?? "glm-5.2",
+      systemRoleLabel: "You are the high-reasoning, repo-aware support answer drafter with read-only tools.",
+      clientLabel: "support-drafter",
       requestTimeoutMs: Number(process.env.OPENCODE_TIMEOUT_MS ?? process.env.STEVESBOT_MODEL_TIMEOUT_MS ?? "180000"),
-      fallbackProviders: buildOpenCodeFallbackProviders(process.env, "gpt-drafter"),
+      fallbackProviders: buildOpenCodeFallbackProviders(process.env, "support-drafter"),
     });
 
     const pipeline = new SupportPipeline(appConfig, database, qwenClient, openCodeClient);
@@ -320,7 +320,7 @@ async function main(): Promise<void> {
         });
         console.log(`[TRIAGE-EVENT] Recorded: channel=${state.channelId} product=${state.product ?? "?"} platform=${state.platform ?? "?"} searched=${searchRequested}`);
       },
-      // Command channel deps: allows Steve to interact with the bot directly
+      // Command channel dependencies allow the maintainer to interact with the bot directly.
       { db: database, rootDir: appConfig.rootDir, p2pBridge },
     );
     // Retry login with exponential backoff (VPN/network may be temporarily down)

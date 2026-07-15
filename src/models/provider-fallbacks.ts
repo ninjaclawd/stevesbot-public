@@ -77,13 +77,13 @@ export function buildOpenCodeFallbackProviders(
   clientLabelPrefix: string,
 ): OpenAiCompatProviderOptions[] {
   const timeoutMs = parseTimeoutMs(env.OPENCODE_FALLBACK_TIMEOUT_MS ?? env.OPENCODE_TIMEOUT_MS ?? env.STEVESBOT_MODEL_TIMEOUT_MS, 180_000);
-  const baseUrl = env.OPENCODE_FALLBACK_BASE_URL ?? env.OPENCODE_BASE_URL ?? "https://api.opencode.ai/v1";
+  const baseUrl = env.OPENCODE_FALLBACK_BASE_URL ?? env.OPENCODE_BASE_URL ?? "https://opencode.ai/zen/v1";
   const apiKey = env.OPENCODE_FALLBACK_API_KEY ?? env.OPENCODE_API_KEY;
   const candidates = [
-    env.OPENCODE_FALLBACK_MODEL_1 ?? "minimax-m2.5-free",
-    env.OPENCODE_FALLBACK_MODEL_2 ?? "nemotron-3-super-free",
-    env.OPENCODE_FALLBACK_MODEL_3 ?? "mimo-v2-flash-free",
-    env.OPENCODE_FALLBACK_MODEL_4 ?? "big-pickle",
+    env.OPENCODE_FALLBACK_MODEL_1 ?? "deepseek-v4-flash-free",
+    env.OPENCODE_FALLBACK_MODEL_2 ?? "big-pickle",
+    env.OPENCODE_FALLBACK_MODEL_3,
+    env.OPENCODE_FALLBACK_MODEL_4,
   ]
     .map((value) => value?.trim())
     .filter((value): value is string => Boolean(value));
@@ -95,6 +95,19 @@ export function buildOpenCodeFallbackProviders(
     clientLabel: `${clientLabelPrefix}:fallback:${model}`,
     requestTimeoutMs: timeoutMs,
   }));
+
+  const zaiBaseUrl = env.ZAI_CODING_BASE_URL?.trim();
+  const zaiModel = env.ZAI_CODING_MODEL?.trim();
+  const enableZai = (env.STEVESBOT_ENABLE_ZAI_FALLBACK ?? "true").trim().toLowerCase() !== "false";
+  if (enableZai && zaiBaseUrl && zaiModel) {
+    providers.push({
+      baseUrl: zaiBaseUrl,
+      apiKey: env.ZAI_CODING_API_KEY?.trim() || undefined,
+      model: zaiModel,
+      clientLabel: `${clientLabelPrefix}:fallback:zai:${zaiModel}`,
+      requestTimeoutMs: parseTimeoutMs(env.ZAI_CODING_TIMEOUT_MS ?? env.STEVESBOT_MODEL_TIMEOUT_MS, 180_000),
+    });
+  }
 
   const enableLocalQwen = (env.STEVESBOT_ENABLE_LOCAL_QWEN_FALLBACK ?? "true").trim().toLowerCase() !== "false";
   if (enableLocalQwen) {

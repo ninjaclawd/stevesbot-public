@@ -39,7 +39,7 @@ data_queries:
       ORDER BY indexed_at DESC LIMIT 15
 
 prompt_template: |
-  You are extracting Q&A pairs from approved bot replies for Steve Seguin's streaming tools.
+  You are extracting Q&A pairs from approved bot replies for the configured products.
 
   CRITICAL PRODUCT KNOWLEDGE — get these right or the Q&A is useless:
   - VDO.Ninja (vdo.ninja) — BROWSER-BASED WebRTC tool. NOT a standalone app. It IS a web app accessed via browser. It has a native mobile app (iOS/Android), an OBS plugin, a VST plugin, and a Game Capture app, but the main product is the website. URL parameters like &push, &view, &room, &bitrate, &codec control behavior.

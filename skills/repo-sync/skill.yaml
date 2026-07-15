@@ -1,0 +1,13 @@
+type: script
+id: repo-sync
+name: Repository Sync
+description: >
+  Fast-forward local repository mirrors before changelog and repository-aware support jobs run.
+schedule: "0 4 * * *"
+interpreter: /bin/bash
+entrypoint: ../../scripts/update-repos.sh
+args: []
+env: {}
+timeout: 180000
+report_to: review_channel
+report_on_success: false

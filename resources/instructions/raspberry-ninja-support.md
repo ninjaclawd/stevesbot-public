@@ -83,4 +83,4 @@ python3 publish.py --test                        # test with built-in sources
 
 - If the issue is a GStreamer version/build problem, suggest updating GStreamer or re-running the installer.
 - If the issue is VDO.Ninja connectivity (not Raspberry Ninja specific), refer to VDO.Ninja support.
-- If Steve is already helping in the thread, do not draft a reply.
+- If the maintainer is already helping in the thread, do not draft a reply.

@@ -72,7 +72,7 @@ async function analyzeVDONinja(): Promise<void> {
   const problemList = topProblems.map((p, i) => `${i+1}. PROBLEM: ${p.problem_statement}\n   SOLUTION: ${p.solution}\n   KEYWORDS: ${p.keywords_json}`).join("\n\n");
 
   const result = await gpt(
-    "You are a senior developer who deeply understands VDO.Ninja (browser WebRTC tool by Steve Seguin). You have access to the README, changelog, and 50 real resolved support threads. Generate the most comprehensive, practical support reference possible.",
+    "You are a senior developer who deeply understands VDO.Ninja, a browser WebRTC tool. You have access to configured documentation and resolved support records. Generate a practical evidence-based support reference.",
     `## VDO.Ninja README (excerpt):
 ${readme.slice(0, 15000)}
 
@@ -117,7 +117,7 @@ async function analyzeSSN(): Promise<void> {
   const problemList = topProblems.map((p, i) => `${i+1}. PROBLEM: ${p.problem_statement}\n   SOLUTION: ${p.solution}\n   PLATFORMS: ${p.platforms_json}`).join("\n\n");
 
   const result = await gpt(
-    "You are a senior developer who deeply understands Social Stream Ninja (chat aggregation extension/app by Steve Seguin). Generate the most comprehensive support reference possible.",
+    "You are a senior developer who deeply understands Social Stream Ninja, a chat aggregation extension/app. Generate a practical evidence-based support reference.",
     `## Social Stream Ninja README (excerpt):
 ${readme.slice(0, 15000)}
 
@@ -158,7 +158,7 @@ async function analyzeUnresolved(): Promise<void> {
   const list = unresolved.map((u, i) => `${i+1}. [${u.category}] ${u.products_json} — ${u.problem_statement}\n   Errors: ${u.error_signals_json}\n   Keywords: ${u.keywords_json}`).join("\n\n");
 
   const result = await gpt(
-    "You are a support analyst identifying patterns in UNRESOLVED support issues for Steve Seguin's streaming tools.",
+    "You are a support analyst identifying patterns in unresolved support issues for the configured products.",
     `Here are 80 UNRESOLVED support threads — problems that were never solved:
 
 ${list}
@@ -169,7 +169,7 @@ Analyze these and generate:
 2. **Potential Solutions** — Based on your knowledge of WebRTC, browsers, and streaming tools, suggest solutions that MIGHT work for the top unsolved issues.
 3. **Documentation Gaps** — What topics need better documentation to prevent these questions?
 4. **Bug Patterns** — Any patterns that suggest actual software bugs vs user error?
-5. **Priority Recommendations** — If Steve could fix 5 things to eliminate the most support threads, what should they be?
+5. **Priority Recommendations** — Which five improvements could eliminate the most support threads?
 
 Be specific and actionable.`,
     8000
@@ -295,7 +295,7 @@ async function analyzeIntegrations(): Promise<void> {
   const list = multiProduct.map((m, i) => `${i+1}. [${m.products_json}] ${m.problem_statement}\n   SOLUTION: ${m.solution}`).join("\n\n");
 
   const result = await gpt(
-    "You are documenting how Steve Seguin's streaming tools work together. Users often combine multiple tools.",
+    "You are documenting how the configured streaming tools work together. Users often combine multiple tools.",
     `Here are 40 real support threads where users used MULTIPLE products together:
 
 ${list}

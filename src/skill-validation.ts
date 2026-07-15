@@ -40,67 +40,156 @@ type DeclarativeValidationContext = {
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAukB9pY9lS0AAAAASUVORK5CYII=";
 
-async function withValidationDatabases<T>(rootDir: string, fn: () => Promise<T>): Promise<T> {
-  const dbDir = path.join(rootDir, "data", "sqlite");
-  const createdPaths: string[] = [];
+async function withValidationDatabases<T>(_rootDir: string, fn: (validationRoot: string) => Promise<T>): Promise<T> {
+  // Each validation gets isolated databases. The test runner validates several
+  // skills concurrently, so sharing data/sqlite caused one test to delete files
+  // while another was still querying them.
+  const validationRoot = await mkdtemp(path.join(os.tmpdir(), "stevesbot-skill-db-"));
+  const dbDir = path.join(validationRoot, "data", "sqlite");
 
   await mkdir(dbDir, { recursive: true });
 
   async function ensureDb(fileName: string, init: (db: any) => void): Promise<void> {
     const dbPath = path.join(dbDir, fileName);
-    if (await pathExists(dbPath)) {
-      return;
-    }
     const db = new Database(dbPath);
     try {
       init(db);
     } finally {
       db.close();
     }
-    createdPaths.push(dbPath);
   }
 
   await ensureDb("stevesbot.sqlite", (db) => {
     db.exec(`
       CREATE TABLE workflow_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        route_id TEXT NOT NULL,
+        thread_key TEXT NOT NULL,
+        message_id TEXT NOT NULL UNIQUE,
+        guild_id TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        thread_id TEXT,
+        author_id TEXT NOT NULL,
+        author_name TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        message_content TEXT NOT NULL,
+        discord_created_at TEXT NOT NULL,
+        received_at TEXT NOT NULL,
         outcome TEXT,
         created_at TEXT,
         triage_json TEXT,
         review_json TEXT,
-        author_name TEXT,
-        author_id TEXT
+        reply_text TEXT,
+        error_text TEXT,
+        total_duration_ms INTEGER NOT NULL,
+        qwen_model TEXT NOT NULL,
+        gpt_model TEXT NOT NULL
+      );
+      CREATE TABLE workflow_steps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        step_index INTEGER NOT NULL,
+        phase TEXT NOT NULL,
+        label TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        input_text TEXT,
+        output_text TEXT
+      );
+      CREATE TABLE workflow_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        route_id TEXT NOT NULL,
+        message_id TEXT NOT NULL UNIQUE,
+        event_json TEXT NOT NULL,
+        status TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        lease_owner TEXT,
+        lease_expires_at TEXT,
+        available_at TEXT NOT NULL,
+        run_id INTEGER,
+        last_error TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT
+      );
+      CREATE TABLE run_feedback (
+        run_id INTEGER NOT NULL UNIQUE,
+        rating TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE draft_usage (
+        run_id INTEGER NOT NULL UNIQUE,
+        usage TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE qa_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        route_id TEXT NOT NULL,
+        question_text TEXT NOT NULL,
+        answer_text TEXT NOT NULL
+      );
+      CREATE TABLE user_memory (
+        author_id TEXT PRIMARY KEY,
+        author_name TEXT NOT NULL,
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      );
+      CREATE TABLE score_log (
+        event_type TEXT NOT NULL,
+        points INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
       CREATE TABLE chores (
         id TEXT PRIMARY KEY,
+        skill_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        schedule TEXT NOT NULL,
         enabled INTEGER,
         last_status TEXT,
         last_run_at TEXT,
-        last_result TEXT
+        last_result TEXT,
+        run_count INTEGER NOT NULL DEFAULT 0
       );
     `);
 
     const insertRun = db.prepare(`
-      INSERT INTO workflow_runs (outcome, created_at, triage_json, review_json, author_name, author_id)
-      VALUES (?, datetime('now', ?), ?, ?, ?, ?)
+      INSERT INTO workflow_runs (
+        route_id, thread_key, message_id, guild_id, channel_id, author_id, author_name,
+        source_url, message_content, discord_created_at, received_at, outcome, created_at,
+        triage_json, review_json, reply_text, total_duration_ms, qwen_model, gpt_model
+      ) VALUES ('product-support', 'thread-1', ?, 'guild-1', 'channel-1', ?, ?,
+        'https://example.test/support', ?, datetime('now', ?), datetime('now', ?), ?, datetime('now', ?),
+        ?, ?, ?, 1000, 'router-model', 'drafter-model')
     `);
-    insertRun.run("approved", "-1 day", JSON.stringify({ directAsk: true, category: "troubleshooting" }), null, "sample-user", "user-1");
-    insertRun.run("hold", "-2 days", JSON.stringify({ directAsk: true, category: "configuration" }), null, "sample-user", "user-1");
-    insertRun.run("error", "-3 days", JSON.stringify({ directAsk: true, category: "troubleshooting" }), null, "sample-user", "user-1");
-    insertRun.run("rejected", "-4 days", JSON.stringify({ directAsk: true, category: "bug-report" }), JSON.stringify({ policyFlags: ["grounding"] }), "another-user", "user-2");
+    insertRun.run("message-1", "user-1", "sample-user", "Audio is broken; can you help?", "-1 day", "-1 day", "approved", "-1 day", JSON.stringify({ directAsk: true, category: "troubleshooting" }), null, "Use the documented audio setting.");
+    insertRun.run("message-2", "user-1", "sample-user", "How do I configure this?", "-2 days", "-2 days", "hold", "-2 days", JSON.stringify({ directAsk: true, category: "configuration" }), null, null);
+    insertRun.run("message-3", "user-1", "sample-user", "The service crashed again", "-3 days", "-3 days", "error", "-3 days", JSON.stringify({ directAsk: true, category: "troubleshooting" }), null, null);
+    insertRun.run("message-4", "user-2", "another-user", "This answer needs evidence", "-4 days", "-4 days", "rejected", "-4 days", JSON.stringify({ directAsk: true, category: "user-requested-bot-help" }), JSON.stringify({ policyFlags: ["grounding"], issues: ["missing evidence"] }), null);
+    db.prepare("INSERT INTO run_feedback (run_id, rating, note) VALUES (1, 'good', 'helpful')").run();
+    db.prepare("INSERT INTO draft_usage (run_id, usage) VALUES (1, 'used')").run();
+    db.prepare("INSERT INTO qa_entries (route_id, question_text, answer_text) VALUES ('product-support', 'sample question', 'sample answer')").run();
+    db.prepare("INSERT INTO user_memory (author_id, author_name, first_seen_at, last_seen_at) VALUES ('user-1', 'sample-user', datetime('now', '-1 day'), datetime('now'))").run();
+    db.prepare("INSERT INTO score_log (event_type, points) VALUES ('approved_reply', 10)").run();
+    db.prepare("INSERT INTO workflow_steps (run_id, step_index, phase, label, status, started_at, completed_at, duration_ms, input_text, output_text) VALUES (1, 0, 'tool', 'searchSupport', 'ok', datetime('now'), datetime('now'), 5, 'audio', 'sample result')").run();
 
     const insertChore = db.prepare(`
-      INSERT INTO chores (id, enabled, last_status, last_run_at, last_result)
-      VALUES (?, ?, ?, datetime('now', ?), ?)
+      INSERT INTO chores (id, skill_id, name, schedule, enabled, last_status, last_run_at, last_result)
+      VALUES (?, ?, ?, '0 0 * * *', ?, ?, datetime('now', ?), ?)
     `);
-    insertChore.run("auto-mine", 1, "ok", "-1 day", "Auto-mine healthy");
-    insertChore.run("weekly-kb-mining", 0, "ok", "-2 days", "Weekly mining paused");
-    insertChore.run("monthly-kb-refresh", 1, "ok", "-7 days", "Monthly refresh healthy");
+    insertChore.run("auto-mine", "auto-mine-threads", "Auto mine", 1, "ok", "-1 day", "Auto-mine healthy");
+    insertChore.run("weekly-kb-mining", "weekly-kb-mining", "Weekly mining", 0, "ok", "-2 days", "Weekly mining paused");
+    insertChore.run("monthly-kb-refresh", "monthly-kb-refresh", "Monthly refresh", 1, "ok", "-7 days", "Monthly refresh healthy");
   });
 
   await ensureDb("knowledge.sqlite", (db) => {
     db.exec(`
       CREATE TABLE mined_threads (
         thread_id TEXT,
+        thread_name TEXT,
+        products_json TEXT,
         summary TEXT,
         solution TEXT,
         keywords_json TEXT,
@@ -108,15 +197,24 @@ async function withValidationDatabases<T>(rootDir: string, fn: () => Promise<T>)
         category TEXT,
         indexed_at TEXT
       );
+      CREATE VIRTUAL TABLE mined_threads_fts USING fts5(
+        summary,
+        problem_statement,
+        solution,
+        keywords_text,
+        products_text,
+        error_signals_text
+      );
     `);
 
     const insertThread = db.prepare(`
-      INSERT INTO mined_threads (thread_id, summary, solution, keywords_json, resolved, category, indexed_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now', ?))
+      INSERT INTO mined_threads (thread_id, thread_name, products_json, summary, solution, keywords_json, resolved, category, indexed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?))
     `);
-    insertThread.run("thread-1", "Resolved OBS audio sync issue with relay settings and codec tuning for a user report.", "Set a fixed bitrate and retry with updated relay settings.", JSON.stringify(["obs", "audio", "relay"]), 1, "troubleshooting", "-1 day");
-    insertThread.run("thread-2", "Documented a configuration fix for Social Stream sign-in handling.", "Re-authenticate and restart the affected source.", JSON.stringify(["social-stream", "login", "configuration"]), 1, "configuration", "-3 days");
-    insertThread.run("thread-3", "Captured an unresolved browser compatibility report for Safari screen sharing.", "", JSON.stringify(["safari", "screenshare"]), 0, "compatibility", "-10 days");
+    insertThread.run("thread-1", "Audio support sample", JSON.stringify(["sample-product"]), "Resolved audio sync issue with relay settings and codec tuning for a user report.", "Set a fixed bitrate and retry with updated relay settings.", JSON.stringify(["audio", "relay", "codec"]), 1, "troubleshooting", "-1 day");
+    insertThread.run("thread-2", "Sign-in support sample", JSON.stringify(["sample-product"]), "Documented a configuration fix for sign-in handling.", "Re-authenticate and restart the affected source.", JSON.stringify(["login", "configuration", "restart"]), 1, "configuration", "-3 days");
+    insertThread.run("thread-3", "Browser support sample", JSON.stringify(["sample-product"]), "Captured an unresolved browser compatibility report for screen sharing.", "", JSON.stringify(["browser", "screenshare"]), 0, "compatibility", "-10 days");
+    db.prepare("INSERT INTO mined_threads_fts(rowid, summary, problem_statement, solution, keywords_text, products_text, error_signals_text) SELECT rowid, summary, '', solution, keywords_json, products_json, '' FROM mined_threads").run();
   });
 
   await ensureDb("archive.sqlite", (db) => {
@@ -134,9 +232,9 @@ async function withValidationDatabases<T>(rootDir: string, fn: () => Promise<T>)
   });
 
   try {
-    return await fn();
+    return await fn(validationRoot);
   } finally {
-    await Promise.all(createdPaths.map((dbPath) => rm(dbPath, { force: true })));
+    await rm(validationRoot, { recursive: true, force: true });
   }
 }
 
@@ -476,11 +574,15 @@ async function withMockServer<T>(
 
 async function validateDeclarativeSkill(skill: Extract<SkillManifest, { type: "declarative" }>, rootDir: string): Promise<SkillValidationResult> {
   const envOverrides: Record<string, string> = skill.id === "auto-mine-threads"
-    ? { AUTO_MINE_DRY_RUN: "1" }
+    ? {
+      AUTO_MINE_DRY_RUN: "1",
+      STEVESBOT_NODE: process.execPath,
+      STEVESBOT_TSX_LOADER: path.join(rootDir, "node_modules", "tsx", "dist", "loader.mjs"),
+    }
     : {};
 
   return withEnv(envOverrides, async () => {
-    const data = await withValidationDatabases(rootDir, async () => gatherData(skill.data_queries, rootDir));
+    const data = await withValidationDatabases(rootDir, async (validationRoot) => gatherData(skill.data_queries, validationRoot));
     if (skill.id === "auto-mine-threads" && isQueryError(data.run_mining ?? "")) {
       data.run_mining = "Dry run: would launch mining batch (limit 10).";
     }
@@ -532,13 +634,15 @@ async function validateDeclarativeSkill(skill: Extract<SkillManifest, { type: "d
 }
 
 async function validateSystemHealthSkill(skill: Extract<SkillManifest, { type: "script" }>, rootDir: string): Promise<SkillValidationResult> {
-  const run = await runScriptSkill(skill, rootDir, { timeoutMs: 45_000 });
-  const checks = [
-    makeCheck("process:exit", run.exitCode === 0, `exit=${run.exitCode}; stderr=${run.stderr.slice(0, 200) || "(none)"}`),
-    makeCheck("output:status", run.stdout.includes("Status:"), run.stdout.slice(0, 300) || "(empty stdout)"),
-    makeCheck("output:summary", run.stdout.includes("One-line summary:"), run.stdout.slice(0, 300) || "(empty stdout)"),
-  ];
-  return finalizeResult(skill.id, "live-e2e", checks, run.exitCode === 0 ? "system health script executed successfully" : "system health script failed");
+  return withValidationDatabases(rootDir, async (validationRoot) => {
+    const run = await runScriptSkill(skill, validationRoot, { timeoutMs: 45_000 });
+    const checks = [
+      makeCheck("process:exit", run.exitCode === 0, `exit=${run.exitCode}; stderr=${run.stderr.slice(0, 200) || "(none)"}`),
+      makeCheck("output:status", run.stdout.includes("Status:"), run.stdout.slice(0, 300) || "(empty stdout)"),
+      makeCheck("output:summary", run.stdout.includes("One-line summary:"), run.stdout.slice(0, 300) || "(empty stdout)"),
+    ];
+    return finalizeResult(skill.id, "live-e2e", checks, run.exitCode === 0 ? "system health script executed successfully" : "system health script failed");
+  });
 }
 
 async function validateVisionAnalyzerSkill(skill: Extract<SkillManifest, { type: "script" }>, rootDir: string): Promise<SkillValidationResult> {

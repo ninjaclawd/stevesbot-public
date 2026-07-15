@@ -3,7 +3,7 @@ id: daily-digest
 name: Daily Digest
 description: >
   Produce a daily summary of bot activity, key metrics,
-  and anything that needs Steve's attention.
+  and anything that needs the maintainer's attention.
 schedule: "0 20 * * *"
 uses_llm: true
 model_preference: local-qwen
@@ -74,7 +74,7 @@ data_queries:
       WHERE last_seen_at >= datetime('now', '-24 hours')
 
 prompt_template: |
-  You are StevesBot's daily reporter. Produce a concise end-of-day summary for Steve.
+  You are the support bot's daily reporter. Produce a concise end-of-day summary for the maintainer.
 
   Today's data:
   {{data}}
@@ -87,7 +87,7 @@ prompt_template: |
   - Feedback: X good, Y bad
   - Score: X points from Y event types (top: list top 3)
   - Notable: (anything unusual or worth attention)
-  - Action items: (only if something needs Steve's input)
+  - Action items: (only if something needs the maintainer's input)
 
 output_format: text
 report_to: review_channel

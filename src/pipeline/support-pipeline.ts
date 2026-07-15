@@ -1566,7 +1566,7 @@ export class SupportPipeline {
       const explicitBotHelpContext = event.userRequestedBotHelp
         ? [
             "IMPORTANT OVERRIDE: The user explicitly clicked 'Ask the Bot'.",
-            "Do not output a deferral like 'Steve is already handling this', 'no public reply needed', or similar stay-out language.",
+            "Do not output a deferral like 'the maintainer is already handling this', 'no public reply needed', or similar stay-out language.",
             "You must do one of these instead: answer with evidence, ask a focused clarifying question via clarify, or use noAnswer honestly.",
           ].join("\n")
         : "";

@@ -3,7 +3,7 @@ id: sentiment-monitor
 name: Sentiment Monitor
 description: >
   Scan recent Discord messages for frustration signals and flag users
-  who may need human attention from Steve.
+  who may need human attention from the maintainer.
 schedule: "0 */4 * * *"
 uses_llm: true
 model_preference: local-qwen

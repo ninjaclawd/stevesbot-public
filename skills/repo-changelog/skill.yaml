@@ -3,7 +3,7 @@ id: repo-changelog
 name: Repo Changelog
 description: >
   After daily repo updates, summarize new commits across all tracked repos.
-  Helps Steve stay aware of changes without checking each repo manually.
+  Helps the maintainer stay aware of changes without checking each repo manually.
 schedule: "30 4 * * *"
 uses_llm: true
 model_preference: local-qwen

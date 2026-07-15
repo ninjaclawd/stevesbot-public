@@ -69,7 +69,7 @@ async function callOpenCode(
   const apiKey = process.env.OPENCODE_API_KEY ?? "";
   const model = process.env.MINE_MODEL ?? "gpt-5.4";
 
-  const systemPrompt = `You are a senior support knowledge engineer for Steve Seguin's open-source streaming tools ecosystem.
+  const systemPrompt = `You are a senior support knowledge engineer for the configured open-source streaming tools ecosystem.
 
 ## Products you know about:
 - **VDO.Ninja** (vdo.ninja) — Free browser-based WebRTC tool for live video production. Lets you bring remote cameras, screenshares, and audio into OBS or other software. Key features: &push/&view URL parameters, rooms, directors, relay servers, TURN/STUN, Meshcast for scaling, &codec, &bitrate, &quality controls.

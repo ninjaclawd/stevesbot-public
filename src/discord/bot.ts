@@ -137,6 +137,33 @@ export function buildReviewMessage(route: RouteConfig, event: DiscordEventRecord
 const MAINTAINER_IDS = parseMaintainerSet(process.env.STEVESBOT_MAINTAINER_USER_IDS ?? "111111111111111111");
 const MAINTAINER_NAMES = parseMaintainerSet(process.env.STEVESBOT_MAINTAINER_USERNAMES ?? "maintainer,maintainer-user");
 
+const SUPPORT_PROBLEM_PATTERN = /\b(?:help|fix|debug|diagnos(?:e|is|tic)|troubleshoot|error|issue|problem|broken|bug|crash(?:ed|ing|es)?|fail(?:ed|ing|s|ure)?|stuck|unable|offline|disconnect(?:ed|ing|s)?|missing|cannot|can't|won't|not\s+working|doesn['’]?t\s+work)\b/i;
+const SUPPORT_TOPIC_PATTERN = /\b(?:support|product|service|app|website|stream(?:ing)?|camera|webcam|video|audio|microphone|browser|webrtc|relay|overlay|chat|extension|url|link|setting|configuration|config|screenshot|logs?)\b/i;
+const HELP_REQUEST_PATTERN = /\b(?:can|could|would|will)\s+you\b|\b(?:please|help|fix|debug|diagnose|troubleshoot|investigate|check|review|explain|analy[sz]e|look\s+into|take\s+a\s+look)\b|\b(?:how|why|what|where)\s+(?:do|does|can|could|should|is|are|did)\b|\?/i;
+
+/**
+ * Treat only support-relevant @mentions as an explicit request. Discord's parsed
+ * mentions are authoritative; matching visible @text alone would be spoofable.
+ */
+export function isExplicitBotHelpMention(
+  message: Pick<Message, "content" | "mentions">,
+  botUserId: string | undefined,
+): boolean {
+  if (!botUserId || !message.mentions.has(botUserId)) {
+    return false;
+  }
+
+  const requestText = message.content.replace(/<@!?\d+>/g, " ").trim();
+  if (!requestText) {
+    return false;
+  }
+
+  const hasProblem = SUPPORT_PROBLEM_PATTERN.test(requestText);
+  const hasSupportTopic = SUPPORT_TOPIC_PATTERN.test(requestText);
+  const hasRequestLanguage = HELP_REQUEST_PATTERN.test(requestText);
+  return (hasProblem && (hasRequestLanguage || hasSupportTopic)) || (hasSupportTopic && hasRequestLanguage);
+}
+
 /** Map route IDs to triage product IDs for auto-triage in known support channels */
 const ROUTE_PRODUCT_MAP: Record<string, string> = {
   "vdo-ninja-support": "vdo-ninja",
@@ -296,7 +323,15 @@ export class DiscordBot {
       return;
     }
 
-    await this.sink.enqueue(route, toEvent(message));
+    const event = toEvent(message);
+    const isMaintainer = MAINTAINER_IDS.has(message.author.id)
+      || MAINTAINER_NAMES.has(message.author.username.toLowerCase());
+    if (!isMaintainer && isExplicitBotHelpMention(message, this.client.user?.id)) {
+      event.userRequestedBotHelp = true;
+      event.botHelpRequestSource = "mention";
+    }
+
+    await this.sink.enqueue(route, event);
   }
 
   private async onThreadCreate(thread: AnyThreadChannel): Promise<void> {

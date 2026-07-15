@@ -2,7 +2,7 @@ type: declarative
 id: weekly-summary
 name: Weekly Summary
 description: >
-  Comprehensive weekly summary for Steve covering pipeline performance,
+  Comprehensive weekly summary for the maintainer covering pipeline performance,
   user trends, KB growth, and action items.
 schedule: "0 18 * * 0"
 uses_llm: true
@@ -81,7 +81,7 @@ data_queries:
       GROUP BY label ORDER BY cnt DESC
 
 prompt_template: |
-  Produce a weekly summary report for Steve (the maintainer).
+  Produce a weekly summary report for the maintainer.
 
   Data from the last 7 days:
   {{data}}

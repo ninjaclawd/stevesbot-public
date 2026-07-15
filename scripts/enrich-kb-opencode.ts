@@ -147,7 +147,7 @@ async function main(): Promise<void> {
       log(`  Enriching: ${entry.thread_name} (was: ${entry.summary.slice(0, 50)}...)`);
 
       const result = await callGPT(
-        `You are a support knowledge engineer for Steve Seguin's streaming tools (VDO.Ninja, Social Stream Ninja, Electron Capture, Raspberry Ninja, Caption Ninja). Extract the best possible structured knowledge from this support thread. The existing entry was low quality — make it much better.`,
+        `You are a support knowledge engineer for the configured streaming tools. Extract the best possible structured knowledge from this support thread. The existing entry was low quality — make it much better.`,
         `Thread: ${entry.thread_name}
 Existing weak summary: ${entry.summary}
 Existing weak solution: ${entry.solution}
@@ -211,7 +211,7 @@ Return JSON:
     try {
       log(`  Generating FAQ for: ${cat} (${entries.length} resolved entries)`);
       const faq = await callGPT(
-        "You are writing a FAQ document for Steve Seguin's streaming tools support. Generate clear, practical Q&A pairs that will help both humans and AI bots answer future questions. Group by product when possible.",
+        "You are writing a support FAQ. Generate clear, practical Q&A pairs that will help both humans and support bots answer future questions. Group by product when possible.",
         `Generate a FAQ section for the "${cat}" category based on these ${entries.length} resolved support threads:
 
 ${entrySummaries}
@@ -256,7 +256,7 @@ Focus on the most common and useful patterns. Include specific technical details
     try {
       log(`  Generating issue summary for: ${product} (${entries.length} entries)`);
       const summary = await callGPT(
-        `You are a product analyst for ${product}, one of Steve Seguin's streaming tools. Analyze support patterns and generate a comprehensive reference document.`,
+        `You are a product analyst for ${product}. Analyze support patterns and generate a comprehensive reference document.`,
         `Based on ${entries.length} real support threads for ${product}, generate a reference document:
 
 ${entrySummaries}

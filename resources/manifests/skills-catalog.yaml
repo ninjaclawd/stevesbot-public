@@ -22,7 +22,7 @@ skills:
     category: reporting
     description: >-
       Analyzes 7-day support data to find category spikes, repeat askers (3+ questions), and top rejection reasons.
-      Triggers daily at 9 AM. Outputs actionable bullet points flagging anything unusual for Steve.
+      Triggers daily at 9 AM. Outputs actionable bullet points flagging anything unusual for the maintainer.
     status: active
     schedule: "0 9 * * *"
     requirements: [db, llm]
@@ -55,7 +55,7 @@ skills:
     description: >-
       Runs git log on all 8 tracked repos (VDO.Ninja, SSN, Raspberry Ninja, etc.) for the past 25 hours
       and summarizes new commits per repo. Triggers daily at 4:30 AM after repo pulls.
-      Outputs grouped commit summaries so Steve doesn't have to check each repo.
+      Outputs grouped commit summaries so the maintainer does not have to check each repo.
     status: active
     schedule: "30 4 * * *"
     requirements: [shell, llm]
@@ -66,7 +66,7 @@ skills:
     description: >-
       Produces end-of-day summary: pipeline run counts by outcome, draft acceptance rates,
       active/new users, feedback ratings, score points, and notable events.
-      Triggers daily at 8 PM. Outputs formatted digest with action items if anything needs Steve's input.
+      Triggers daily at 8 PM. Outputs a formatted digest with action items if anything needs maintainer input.
     status: active
     schedule: "0 20 * * *"
     requirements: [db, llm]
@@ -98,7 +98,7 @@ skills:
     category: monitoring
     description: >-
       Polls GitHub Issues and PRs across tracked repos every 2 hours for new activity matching keywords.
-      Posts matching updates to Discord. Use when Steve wants real-time awareness of GitHub activity without checking manually.
+      Posts matching updates to Discord for real-time GitHub awareness without manual checking.
     status: available
     schedule: "0 */2 * * *"
     requirements: [internet, shell]
@@ -138,7 +138,7 @@ skills:
     category: user-tracking
     description: >-
       Scans recent Discord messages for frustration signals (repeated questions, negative keywords, escalation patterns).
-      Triggers every 4 hours. Alerts Steve in review channel when users appear stuck or unhappy.
+      Triggers every 4 hours. Alerts the review channel when users appear stuck or unhappy.
     status: available
     schedule: "0 */4 * * *"
     requirements: [db]
@@ -148,7 +148,7 @@ skills:
     category: project-management
     description: >-
       Queries GitHub for open issues with no activity in 30+ days across all tracked repos.
-      Triggers Mondays at 9 AM. Outputs a triage list so Steve can close, update, or re-prioritize stale issues.
+      Triggers Mondays at 9 AM. Outputs a triage list for closing, updating, or re-prioritizing stale issues.
     status: available
     schedule: "0 9 * * 1"
     requirements: [internet, shell]
@@ -168,7 +168,7 @@ skills:
     name: Reminder Scheduler
     category: project-management
     description: >-
-      Lets Steve create timed reminders via the command channel (e.g., "remind me to merge PR #42 Friday").
+      Lets the maintainer create timed reminders via the command channel.
       Checks every 5 minutes for due reminders. Delivers reminder messages to the command channel when triggered.
     status: available
     schedule: "*/5 * * * *"
@@ -210,7 +210,7 @@ skills:
     category: code-analysis
     description: >-
       Scans all tracked repos for TODO, FIXME, and HACK comments with file paths and line numbers.
-      Triggers Mondays at 5 AM. Maintains a living list so Steve can track and prioritize tech debt.
+      Triggers Mondays at 5 AM. Maintains a living list for tracking and prioritizing technical debt.
     status: available
     schedule: "0 5 * * 1"
     requirements: [shell]
@@ -240,7 +240,7 @@ skills:
     category: monitoring
     description: >-
       Pings VDO.Ninja relay servers, TURN servers, and public APIs every 10 minutes to detect downtime.
-      Alerts Steve in review channel when any endpoint is unreachable so he can respond before users report it.
+      Alerts the review channel when an endpoint is unreachable so the maintainer can respond early.
     status: available
     schedule: "*/10 * * * *"
     requirements: [internet, shell]
@@ -260,7 +260,7 @@ skills:
     category: code-analysis
     description: >-
       Runs the test suite and records coverage percentage over time.
-      Triggers daily at 5 AM. Alerts Steve if coverage drops below the previous baseline.
+      Triggers daily at 5 AM. Alerts the maintainer if coverage drops below the previous baseline.
     status: available
     schedule: "0 5 * * *"
     requirements: [shell]
@@ -280,7 +280,7 @@ skills:
     category: project-management
     description: >-
       Tracks open/closed issue counts for GitHub milestones and calculates completion percentage.
-      Triggers Mondays at 9 AM. Posts progress updates so Steve can see which milestones are on track.
+      Triggers Mondays at 9 AM. Posts progress updates showing which milestones are on track.
     status: available
     schedule: "0 9 * * 1"
     requirements: [internet]

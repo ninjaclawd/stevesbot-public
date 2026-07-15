@@ -52,7 +52,7 @@ data_queries:
       GROUP BY flags ORDER BY cnt DESC LIMIT 5
 
 prompt_template: |
-  Analyze this week's support data. Flag only unusual or actionable items for Steve.
+  Analyze this week's support data. Flag only unusual or actionable items for the maintainer.
 
   {{data}}
 

@@ -3,7 +3,7 @@ id: question-frequency-report
 name: Question Frequency Report
 description: >
   Track most-asked question categories over the past week, compare to the
-  previous week, and highlight trends for Steve.
+  previous week, and highlight trends for the maintainer.
 schedule: "0 9 * * 1"
 uses_llm: true
 model_preference: local-qwen
@@ -54,7 +54,7 @@ data_queries:
 
 prompt_template: |
   You are StevesBot's analytics reporter. Analyze question frequency data and
-  produce a clear weekly trends report for Steve.
+  produce a clear weekly trends report for the maintainer.
 
   This week's question categories (last 7 days):
   {{this_week_categories}}
@@ -83,7 +83,7 @@ prompt_template: |
   **Insights:** (2-3 sentences about what the trends suggest — new features causing
   confusion? Recurring issues that need documentation? Seasonal patterns?)
 
-  **Recommendations:** (actionable suggestions for Steve based on the data)
+  **Recommendations:** (actionable suggestions for the maintainer based on the data)
 
 output_format: text
 report_to: review_channel

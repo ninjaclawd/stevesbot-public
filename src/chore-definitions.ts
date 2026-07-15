@@ -15,6 +15,7 @@ export const DEFAULT_CHORES: ChoreDefinition[] = [
   { id: "knowledge-gaps", skillId: "knowledge-gap-detector", name: "Knowledge Gap Detector", schedule: "0 10 * * *" },
   { id: "auto-mine", skillId: "auto-mine-threads", name: "Auto Mine Threads", schedule: "0 3 * * *", enabledByDefault: false },
   { id: "weekly-summary", skillId: "weekly-summary", name: "Weekly Summary", schedule: "0 18 * * 0", enabledByDefault: false },
+  { id: "repo-sync", skillId: "repo-sync", name: "Repository Sync", schedule: "0 4 * * *" },
   { id: "repo-changelog", skillId: "repo-changelog", name: "Repo Changelog", schedule: "30 4 * * *" },
   { id: "auto-learn", skillId: "auto-learn-from-approvals", name: "Auto-Learn from Approvals", schedule: "0 21 * * *", enabledByDefault: false },
   { id: "faq-auto-builder", skillId: "faq-auto-builder", name: "FAQ Auto-Builder", schedule: "0 11 * * *" },

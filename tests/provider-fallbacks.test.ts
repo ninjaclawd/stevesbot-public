@@ -42,24 +42,22 @@ test("buildPreferredLocalQwenProviders deduplicates identical primary and legacy
   assert.equal(providers.length, 1);
 });
 
-test("buildOpenCodeFallbackProviders returns 6 providers with defaults", () => {
+test("buildOpenCodeFallbackProviders returns current cloud and local defaults", () => {
   const providers = buildOpenCodeFallbackProviders({}, "test");
-  assert.equal(providers.length, 6); // 4 cloud fallbacks + preferred local host + legacy local fallback
-  assert.equal(providers[0].model, "minimax-m2.5-free");
-  assert.equal(providers[1].model, "nemotron-3-super-free");
-  assert.equal(providers[2].model, "mimo-v2-flash-free");
-  assert.equal(providers[3].model, "big-pickle");
-  assert.equal(providers[4].model, "local-qwen-primary");
-  assert.match(providers[5].model, /qwen/i);
+  assert.equal(providers.length, 4); // 2 cloud fallbacks + preferred local host + legacy local fallback
+  assert.equal(providers[0].model, "deepseek-v4-flash-free");
+  assert.equal(providers[1].model, "big-pickle");
+  assert.equal(providers[2].model, "local-qwen-primary");
+  assert.match(providers[3].model, /qwen/i);
 });
 
 test("buildOpenCodeFallbackProviders uses default base URL", () => {
   const providers = buildOpenCodeFallbackProviders({}, "test");
-  for (const p of providers.slice(0, 4)) {
-    assert.equal(p.baseUrl, "https://api.opencode.ai/v1");
+  for (const p of providers.slice(0, 2)) {
+    assert.equal(p.baseUrl, "https://opencode.ai/zen/v1");
   }
-  assert.equal(providers[4].baseUrl, "http://127.0.0.1:8000/v1");
-  assert.equal(providers[5].baseUrl, "http://127.0.0.1:11434/v1");
+  assert.equal(providers[2].baseUrl, "http://127.0.0.1:8000/v1");
+  assert.equal(providers[3].baseUrl, "http://127.0.0.1:11434/v1");
 });
 
 test("buildOpenCodeFallbackProviders respects custom base URL", () => {
@@ -100,7 +98,7 @@ test("buildOpenCodeFallbackProviders handles invalid timeout gracefully", () => 
 test("buildOpenCodeFallbackProviders can disable local Qwen", () => {
   const env = { STEVESBOT_ENABLE_LOCAL_QWEN_FALLBACK: "false" };
   const providers = buildOpenCodeFallbackProviders(env as any, "test");
-  assert.equal(providers.length, 4); // No local providers
+  assert.equal(providers.length, 2); // No local providers
   assert.ok(providers.every(p => !p.clientLabel.includes("local-qwen")));
 });
 
@@ -145,14 +143,14 @@ test("buildOpenCodeFallbackProviders deduplicates providers", () => {
 test("buildOpenCodeFallbackProviders sets correct clientLabel prefix", () => {
   const providers = buildOpenCodeFallbackProviders({}, "drafter");
   assert.match(providers[0].clientLabel, /^drafter:fallback:/);
-  assert.match(providers[4].clientLabel, /^drafter:fallback:local-qwen$/);
-  assert.match(providers[5].clientLabel, /^drafter:fallback:local-qwen:legacy$/);
+  assert.match(providers[2].clientLabel, /^drafter:fallback:local-qwen$/);
+  assert.match(providers[3].clientLabel, /^drafter:fallback:local-qwen:legacy$/);
 });
 
 test("buildOpenCodeFallbackProviders passes API key to all providers", () => {
   const env = { OPENCODE_FALLBACK_API_KEY: "sk-test-123" };
   const providers = buildOpenCodeFallbackProviders(env as any, "test");
-  for (const p of providers.slice(0, 4)) {
+  for (const p of providers.slice(0, 2)) {
     assert.equal(p.apiKey, "sk-test-123");
   }
 });
@@ -189,4 +187,19 @@ test("buildOpenCodeFallbackProviders filters empty model strings", () => {
   // Empty/whitespace cloud models should be filtered out; local providers still remain.
   assert.ok(providers.length <= 5);
   assert.ok(providers.every(p => p.model.trim().length > 0));
+});
+
+test("buildOpenCodeFallbackProviders appends an optional Z.ai coding fallback", () => {
+  const providers = buildOpenCodeFallbackProviders({
+    ZAI_CODING_BASE_URL: "https://api.example.test/v1",
+    ZAI_CODING_MODEL: "coding-lite",
+    ZAI_CODING_API_KEY: "test-key",
+    STEVESBOT_ENABLE_LOCAL_QWEN_FALLBACK: "false",
+  } as any, "test");
+  assert.deepEqual(providers.map((provider) => provider.model), [
+    "deepseek-v4-flash-free",
+    "big-pickle",
+    "coding-lite",
+  ]);
+  assert.equal(providers[2]?.clientLabel, "test:fallback:zai:coding-lite");
 });

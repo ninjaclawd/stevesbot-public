@@ -53,7 +53,7 @@ data_queries:
       ORDER BY indexed_at DESC LIMIT 10
 
 prompt_template: |
-  You are StevesBot's FAQ curator for Steve Seguin's streaming tools.
+  You are the support bot's FAQ curator for the configured products.
 
   PRODUCT KNOWLEDGE (use correct terminology):
   - VDO.Ninja — browser-based WebRTC tool (web app, NOT a standalone app). URL params: &push, &view, &room, &bitrate, &codec, &relay, &director, etc.
