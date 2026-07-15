@@ -1,6 +1,31 @@
-# StevesBot
+<div align="center">
 
-StevesBot is a Discord support assistant that researches a question, drafts a grounded answer, and lets a human review the draft before it is posted.
+# 🛟 StevesBot
+
+### Evidence-first Discord support, with a human still in charge
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Tests](https://img.shields.io/badge/tests-320%20passing-2ea44f)](#-development)
+[![License: MIT](https://img.shields.io/badge/license-MIT-f2c744)](LICENSE)
+[![Privacy](https://img.shields.io/badge/privacy-local--first-6f42c1)](docs/PRIVACY_AND_PUBLIC_EXPORT.md)
+
+[Quick start](#-quick-start) · [How it works](#-how-it-works) · [Knowledge and feedback](docs/KNOWLEDGE_AND_FEEDBACK.md) · [Setup guide](docs/SETUP_GUIDE.md) · [Privacy](docs/PRIVACY_AND_PUBLIC_EXPORT.md)
+
+</div>
+
+StevesBot is a Discord support assistant that researches a question, drafts a grounded answer, and lets a human review the draft before anything is posted.
+
+> [!IMPORTANT]
+> StevesBot does **not** secretly retrain an AI model on Discord users. Its memory is a local, inspectable collection of reviewed support records that you can correct or delete.
+
+## ✨ At a glance
+
+| Evidence first | Human in the loop | Local-first memory |
+| --- | --- | --- |
+| Searches approved answers, solved threads, documentation, and source code before drafting. | A reviewer can send, edit, or reject every proposed answer. | SQLite stores searchable support knowledge without changing the model itself. |
+
+## 🧭 How it works
 
 Think of it as a careful support clerk:
 
@@ -12,15 +37,30 @@ Think of it as a careful support clerk:
 6. A human can send, edit, or reject the answer.
 7. Useful reviewed results become easier to find next time.
 
-The bot does **not** secretly retrain a model on Discord users. Its “learning” is a local, inspectable knowledge system made from reviewed records.
+```mermaid
+flowchart LR
+    A[Discord message] --> B{Allowed route?}
+    B -->|No| C[Ignore]
+    B -->|Yes| D[Triage]
+    D -->|Reply useful| E[Retrieve evidence]
+    D -->|No reply needed| C
+    E --> F[Draft answer]
+    F --> G[Validate claims]
+    G --> H[Human review]
+    H -->|Send or edit| I[Discord reply]
+    H -->|Reject| J[Feedback signal]
+    I --> K[Reviewed local memory]
+    J --> K
+```
 
-## What this public repository is
+## 🔓 What this public repository is
 
 This is a sanitized, runnable reference implementation. It includes the bot, tests, scheduled maintenance skills, sample configuration, and empty data directories. It intentionally excludes real messages, account IDs, tokens, databases, logs, attachments, host addresses, private deployment notes, and local repository clones.
 
-All long numeric IDs in samples and tests are synthetic placeholders. Replace them with your own values; do not enable the sample routes unchanged.
+> [!CAUTION]
+> All long numeric IDs in samples and tests are synthetic placeholders. Replace them with your own values, and never enable the sample routes unchanged.
 
-## Main features
+## 🧰 Main features
 
 - Discord intake for configured channels and forum threads
 - Helpful handling of support-relevant `@bot` mentions without forcing replies to jokes or empty mentions
@@ -33,7 +73,7 @@ All long numeric IDs in samples and tests are synthetic placeholders. Replace th
 - SQLite storage and a local observability dashboard
 - Strict TypeScript and automated tests
 
-## The pieces, in plain language
+## 🧩 The pieces, in plain language
 
 | Part | What it does | Where it lives |
 | --- | --- | --- |
@@ -47,7 +87,7 @@ All long numeric IDs in samples and tests are synthetic placeholders. Replace th
 
 For a deeper but still beginner-friendly explanation, see [Knowledge and feedback](docs/KNOWLEDGE_AND_FEEDBACK.md).
 
-## Quick start
+## 🚀 Quick start
 
 You need Node.js 20 or newer, npm, a Discord application, and at least one OpenAI-compatible model endpoint.
 
@@ -58,7 +98,7 @@ npm install
 cp .env.example .env
 ```
 
-Then:
+### Configure it
 
 1. Put your Discord bot token and review-channel ID in `.env`.
 2. Put your own server/channel IDs in `resources/manifests/discord.yaml`.
@@ -76,9 +116,10 @@ npm run dev
 
 The bot creates its local SQLite files when it starts. Keep `.env`, `data/`, `logs/`, `repos/`, and attachments out of Git; the included `.gitignore` already does this.
 
-See [Setup guide](docs/SETUP_GUIDE.md) for the Discord portal, permissions, model choices, first dry run, chores, and troubleshooting.
+> [!TIP]
+> The [step-by-step setup guide](docs/SETUP_GUIDE.md) covers the Discord portal, permissions, model choices, a safe first dry run, chores, and troubleshooting.
 
-## Model routing and cost control
+## 🧠 Model routing and cost control
 
 The harness separates cheap classification work from the harder research-and-drafting work. The public defaults illustrate this order:
 
@@ -91,7 +132,7 @@ Model catalogs and plan limits change. Treat the names in `.env.example` as exam
 
 Small models are useful for routing, keyword extraction, and simple summaries. They should not be trusted to diagnose a difficult issue without evidence. The pipeline therefore gives the drafter read-only search tools and performs a validation pass before review.
 
-## How knowledge retrieval works
+## 🔎 How knowledge retrieval works
 
 The bot searches from the most useful, reviewed material toward the rawest material:
 
@@ -104,7 +145,7 @@ The bot searches from the most useful, reviewed material toward the rawest mater
 
 Search results are evidence, not instructions. Discord text, archived text, repository content, and web pages are treated as untrusted input. The model is told not to invent sources or follow commands found inside that content.
 
-## How the bot improves its own knowledge
+## 🔁 How the bot improves its own knowledge
 
 “Self-improvement” here means a review loop, not autonomous model training:
 
@@ -117,7 +158,7 @@ Search results are evidence, not instructions. Discord text, archived text, repo
 
 A rejected answer does not automatically become trusted knowledge. Raw private messages are not committed to this repository.
 
-## Scheduled chores
+## 🧹 Scheduled chores
 
 The files under `skills/` define jobs such as system health checks, repository changelogs, knowledge-gap reports, thread mining, daily digests, and weekly summaries. Run due chores manually with:
 
@@ -131,7 +172,7 @@ Repository update chores operate only on clones you place under `repos/`. Keep t
 
 The included `repo-sync` skill runs at 4:00 AM and uses `git pull --ff-only`; the changelog follows at 4:30 AM. A diverged or locally modified clone fails visibly instead of being reset or merged automatically. You can also run it with `npm run repo-sync`.
 
-## Privacy and safety boundary
+## 🔐 Privacy and safety boundary
 
 - Routes are deny-by-default: sample routes are disabled.
 - Repository tools are read-only and restricted to configured scopes.
@@ -142,7 +183,7 @@ The included `repo-sync` skill runs at 4:00 AM and uses `git pull --ff-only`; th
 
 Read [Privacy and public exports](docs/PRIVACY_AND_PUBLIC_EXPORT.md) before publishing a fork or sample dataset.
 
-## Project layout
+## 🗂️ Project layout
 
 ```text
 src/                  runtime TypeScript
@@ -157,7 +198,7 @@ repos/                 local read-only product clones (ignored)
 dashboard/             static dashboard assets
 ```
 
-## Before production
+## ✅ Before production
 
 - Test in a private Discord server and keep routes disabled until verified.
 - Start with `STEVESBOT_DRY_RUN=true`.
@@ -167,7 +208,7 @@ dashboard/             static dashboard assets
 - Back up databases securely, outside the public repository.
 - Review model-provider privacy terms before sending message content off-device.
 
-## Development
+## 🧪 Development
 
 ```bash
 npm run dev             # start with tsx
@@ -178,6 +219,8 @@ npm run validate-skills # validate skill manifests
 npm run repo-smoke      # check configured repository access
 ```
 
-## License
+## 📄 License
 
-No license is included yet. The code is visible for study, but no reuse license is granted until the repository owner chooses one. Add a license before inviting third-party redistribution or modification.
+StevesBot is available under the [MIT License](LICENSE). You may use, copy, modify, and distribute it, including in commercial projects, as long as the copyright and license notice remain included.
+
+Third-party packages keep their own licenses; see `package-lock.json` for dependency metadata. In particular, `@vdoninja/sdk` is AGPL-3.0-only with an additional exception permitting an unmodified official SDK distribution to be linked into a larger work under different terms. StevesBot consumes the official npm package without modifying it; review the SDK's [`LICENSE-SDK-EXCEPTION`](https://github.com/steveseguin/ninjasdk/blob/main/LICENSE-SDK-EXCEPTION) before bundling or changing that dependency.
