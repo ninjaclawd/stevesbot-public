@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isExplicitBotHelpMention, routeMatchesMessage } from "../src/discord/bot.js";
+import { directRequestSource, isExplicitBotHelpMention, routeMatchesMessage } from "../src/discord/bot.js";
 import type { RouteConfig } from "../src/types.js";
 
 const threadRoute: RouteConfig = {
@@ -66,7 +66,7 @@ test("channel routes do not match thread traffic", () => {
 function mentionMessage(content: string, mentioned = true) {
   return {
     content,
-    mentions: { has: (id: string) => mentioned && id === "999999999999999999" },
+    mentions: { users: { has: (id: string) => mentioned && id === "999999999999999999" } },
   } as any;
 }
 
@@ -84,4 +84,14 @@ test("empty, spoofed, and unrelated mentions do not force a bot response", () =>
   assert.equal(isExplicitBotHelpMention(mentionMessage("<@999999999999999999>"), "999999999999999999"), false);
   assert.equal(isExplicitBotHelpMention(mentionMessage("@support-bot help debug this", false), "999999999999999999"), false);
   assert.equal(isExplicitBotHelpMention(mentionMessage("<@999999999999999999> tell me a joke"), "999999999999999999"), false);
+});
+
+test("a reply to this bot continues support without a mention or question keyword", () => {
+  const message = mentionMessage("Still the same after restarting", false);
+  message.reference = { messageId: "previous-answer" };
+  message.mentions.repliedUser = { id: "support-bot" };
+  assert.equal(directRequestSource(message, "support-bot"), "reply");
+  assert.equal(directRequestSource(message, "different-bot"), undefined);
+  message.reference = null;
+  assert.equal(directRequestSource(message, "support-bot"), undefined);
 });

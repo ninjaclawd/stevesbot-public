@@ -21,6 +21,7 @@ export type TriageFlowStep = "product" | "platform" | "confirm" | "done";
 export interface TriageFlowState {
   /** The original message ID that triggered the flow */
   triggerMessageId: string;
+  routeId?: string;
   /** Channel/thread the flow is happening in */
   channelId: string;
   /** User who is going through the flow */
@@ -294,7 +295,7 @@ export async function handleTriageInteraction(
       state.step = "platform";
       const productLabel = PRODUCT_OPTIONS.find((o) => o.id === action.product)?.label ?? action.product;
       await interaction.update({
-        content: `Got it \u2014 **${productLabel}**. What platform are you using?`,
+        content: `Got it \u2014 **${productLabel}**. What platform are you using? Select it to ask the bot for help, or skip this prompt.`,
         components: buildPlatformButtons(state.triggerMessageId, state.product) as never[],
       });
       break;
@@ -319,6 +320,7 @@ export async function handleTriageInteraction(
     }
 
     case "search": {
+      state.triageMessageId = interaction.message?.id;
       state.wantsSearch = action.answer === "yes";
       state.step = "done";
 
@@ -355,13 +357,15 @@ export async function sendTriagePrompt(
   triggerMessageId: string,
   userId: string,
   preselectedProduct?: string,
+  routeId?: string,
 ): Promise<{ messageId?: string; error?: string }> {
-  startFlow(channelId, triggerMessageId, userId, preselectedProduct);
+  const state = startFlow(channelId, triggerMessageId, userId, preselectedProduct);
+  state.routeId = routeId;
 
   const productLabel = PRODUCT_OPTIONS.find((o) => o.id === preselectedProduct)?.label;
   const body = preselectedProduct
     ? {
-        content: `Hi! I'm a support bot. I see you're asking about **${productLabel ?? preselectedProduct}**. What platform are you using?`,
+        content: `Hi! I'm a support bot. I see you're asking about **${productLabel ?? preselectedProduct}**. What platform are you using? Select it to ask the bot for help, or skip this prompt.`,
         components: buildPlatformButtons(triggerMessageId, preselectedProduct),
       }
     : {

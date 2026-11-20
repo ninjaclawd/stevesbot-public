@@ -1,16 +1,19 @@
 repos:
   - id: vdo-ninja
-    owner: example-owner
+    owner: steveseguin
     repo: vdo.ninja
+    branch: develop
     localPath: repos/vdo-ninja
     summary: Browser-based live video contribution, guest invite, and streaming workflows.
     allowedPaths:
       - docs
-      - src
+      - main.js
+      - index.html
       - README.md
   - id: social-stream
-    owner: example-owner
+    owner: steveseguin
     repo: social_stream
+    branch: main
     localPath: repos/social_stream
     summary: Chat aggregation and streaming support tooling with broad platform integrations.
     allowedPaths:
@@ -24,8 +27,9 @@ repos:
       - manifest.json
       - README.md
   - id: ssn-app
-    owner: example-owner
+    owner: steveseguin
     repo: ssn_app
+    branch: main
     localPath: repos/ssn_app
     summary: Desktop app for Social Stream Ninja workflows.
     allowedPaths:

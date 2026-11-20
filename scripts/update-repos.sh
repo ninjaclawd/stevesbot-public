@@ -1,42 +1,32 @@
-#!/bin/bash
-# Fast-forward local read-only repository mirrors before repo-aware chores run.
+#!/usr/bin/env bash
+# Refresh only the reference checkouts configured for this installation.
 set -euo pipefail
-shopt -s nullglob
-
-ROOT="${STEVESBOT_ROOT:-$(pwd)}"
-REPOS_DIR="$ROOT/repos"
-LOG="$ROOT/logs/repo-update.log"
-mkdir -p "$(dirname "$LOG")"
-
-if [ ! -d "$REPOS_DIR" ]; then
-  echo "[$(date -Iseconds)] Repo update skipped (missing $REPOS_DIR)" | tee -a "$LOG" >&2
-  exit 1
-fi
-
-FAILED=0
-UPDATED=0
-SKIPPED=0
-
-echo "[$(date -Iseconds)] Starting repo update" >> "$LOG"
-for repo_path in "$REPOS_DIR"/*/; do
-  repo_name="$(basename "$repo_path")"
-  if [ ! -d "$repo_path/.git" ]; then
-    echo "  $repo_name: not a Git repository, skipping" >> "$LOG"
-    SKIPPED=$((SKIPPED + 1))
-    continue
-  fi
-
-  if result="$(git -C "$repo_path" pull --ff-only 2>&1)"; then
-    echo "  $repo_name: $result" >> "$LOG"
-    UPDATED=$((UPDATED + 1))
+ROOT="$(cd "${STEVESBOT_ROOT:-$(dirname "$0")/..}" && pwd)"
+cd "$ROOT"
+mkdir -p logs
+targets="$(node scripts/repo-sync-targets.cjs "$ROOT")"
+failed=0
+while IFS=$'\t' read -r name directory branch repository; do
+  if (
+    cd "$directory" || exit 1
+    [[ -e .git ]] || { echo "Missing checkout"; exit 1; }
+    current="$(git symbolic-ref --short HEAD)" || exit 1
+    remote="$(git config "branch.$current.remote")" || exit 1
+    url="$(git remote get-url "$remote")"
+    case "${url%.git}" in
+      "https://github.com/$repository"|"git@github.com:$repository") ;;
+      *) echo "Unexpected remote for $repository"; exit 1 ;;
+    esac
+    upstream="$(git rev-parse --abbrev-ref '@{upstream}')" || exit 1
+    [[ "$branch" == "-" || ( "$current" == "$branch" && "$upstream" == "$remote/$branch" ) ]] || { echo "Unexpected branch or upstream"; exit 1; }
+    changes="$(git status --porcelain --untracked-files=no)" || exit 1
+    [[ -z "$changes" ]] || { echo "Tracked local changes"; exit 1; }
+    GIT_TERMINAL_PROMPT=0 timeout 45 git fetch --prune "$remote" && git merge-base --is-ancestor HEAD '@{upstream}' && git merge --ff-only '@{upstream}'
+  ) >> logs/repo-update.log 2>&1; then
+    echo "$name up to date"
   else
-    echo "  $repo_name: FAILED: $result" | tee -a "$LOG" >&2
-    FAILED=$((FAILED + 1))
+    echo "$name failed; see logs/repo-update.log" >&2
+    failed=1
   fi
-done
-
-summary="[$(date -Iseconds)] Repo update complete; updated=$UPDATED, failed=$FAILED, skipped=$SKIPPED"
-echo "$summary" | tee -a "$LOG"
-if (( FAILED > 0 )); then
-  exit 1
-fi
+done <<< "$targets"
+exit "$failed"

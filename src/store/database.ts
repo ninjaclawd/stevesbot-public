@@ -697,7 +697,7 @@ export class AppDatabase {
 
     // If user clicked "Ask the Bot" but the job was already queued/completed by passive detection,
     // re-queue it with the userRequestedBotHelp flag so it actually responds.
-    if (existing && event.userRequestedBotHelp) {
+    if (existing && event.userRequestedBotHelp && event.botHelpRequestSource !== "mention" && event.botHelpRequestSource !== "reply" && event.botHelpRequestSource !== "ask-button") {
       if (existing.status === "completed" || existing.status === "queued") {
         this.db.prepare(`
           UPDATE workflow_queue SET event_json = ?, status = 'queued', attempts = 0, available_at = ?, updated_at = ?, run_id = NULL, last_error = NULL

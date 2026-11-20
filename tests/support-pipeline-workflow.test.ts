@@ -192,6 +192,8 @@ function makeEvent(route: RouteConfig, overrides: Partial<DiscordEventRecord> = 
     attachments: overrides.attachments,
     userRequestedBotHelp: overrides.userRequestedBotHelp,
     triageMessageId: overrides.triageMessageId,
+    botHelpRequestSource: overrides.botHelpRequestSource,
+    referencedBotAnswer: overrides.referencedBotAnswer,
   };
 }
 
@@ -1721,13 +1723,16 @@ test("explicit Ask the Bot requests retry drafts that wrongly defer to human han
         threadId: "thread-ask-bot",
         content: "Can you show me how to enable the Windows 3.1 style?",
         userRequestedBotHelp: true,
+        botHelpRequestSource: "reply",
+        referencedBotAnswer: "Did the theme appear in the dropdown?",
       }),
     );
 
     assert.equal(result.posted, true);
     assert.equal(result.reply, "Use the Windows 3.1 theme from the theme list, then activate it on the featured overlay.");
     assert.equal(agent.calls.length, 2, "The drafter should retry once after a deferral draft.");
-    assert.match(agent.calls[0].conversation, /IMPORTANT OVERRIDE: The user explicitly clicked 'Ask the Bot'/);
+    assert.match(agent.calls[0].conversation, /IMPORTANT OVERRIDE: The user explicitly requested help/);
+    assert.match(agent.calls[0].conversation, /Did the theme appear in the dropdown/);
     assert.match(agent.calls[1].conversation, /RETRY INSTRUCTION:/);
     const run = db.getWorkflowRun(result.runId);
     assert.ok(run?.steps.some((step) => step.label === "Retry draft after explicit bot-help deferral"));

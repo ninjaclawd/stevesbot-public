@@ -91,7 +91,7 @@ export class WorkflowQueueWorker {
     leaseTimer.unref?.();
 
     let runId: number | undefined;
-    const botToken = process.env.DISCORD_BOT_TOKEN ?? "";
+    const botToken = this.dryRun ? "" : process.env.DISCORD_BOT_TOKEN ?? "";
     const channelId = job.event.threadId ?? job.event.channelId;
     const triageMessageId = job.event.triageMessageId;
     try {
@@ -167,17 +167,15 @@ export class WorkflowQueueWorker {
           const postResp = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
             method: "POST",
             headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ content: result.reply }),
+            body: JSON.stringify({ content: result.reply, allowed_mentions: { parse: [] } }),
           });
-          if (!postResp.ok) {
-            console.error(`[WORKER] Failed to post reply to thread: ${postResp.status}`);
-          }
           this.pipeline.recordDelivery(result.runId, {
             status: postResp.ok ? "ok" : "error",
             reviewChannelId: channelId,
             body: result.reply,
             durationMs: 0,
           });
+          if (!postResp.ok) throw new Error(`Discord rejected the support reply (HTTP ${postResp.status}).`);
         } else {
           // Normal flow — send to the review channel for a maintainer to approve.
           const startedAt = Date.now();
@@ -203,23 +201,19 @@ export class WorkflowQueueWorker {
         }
       }
 
-      // Clean up triage message and send fallback if needed for user-requested help
-      if (job.event.userRequestedBotHelp && botToken && triageMessageId) {
-        fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${triageMessageId}`, {
-          method: "DELETE", headers: { Authorization: `Bot ${botToken}` },
-        }).catch(() => {});
-
+      if (job.event.userRequestedBotHelp && botToken) {
         if (!result.posted) {
-          const qualityKeywords = /choppy|laggy|quality|bitrate|fps|frame|drops|buffer|packet|relay|slow|freeze|black screen|croppy|cropped|stuttering|jitter|pixelated|blurry|low quality/i;
-          const msgContent = job.event.content ?? "";
-          const fallbackContent = qualityKeywords.test(msgContent)
-            ? "I wasn't able to draft a full answer, but here are some diagnostic steps that usually help:\n\n1. Run https://vdo.ninja/speedtest — this tests packet loss (the #1 cause of quality issues), not bandwidth.\n2. Are you on WiFi or wired? WiFi is the most common cause of intermittent quality drops.\n3. CTRL+click (cmd+click on Mac) on the video in VDO.Ninja to see live stats — check packet loss % and whether the candidate type shows \"relay\".\n\nA human will follow up with more specific help."
-            : "I wasn't able to find a confident answer for this. A human will follow up when available.";
-          fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+          const notice = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
             method: "POST",
             headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ content: fallbackContent }),
-          }).catch((err) => console.error("[WORKER] Failed to send fallback message:", err));
+            body: JSON.stringify({ content: "I couldn't verify an answer to your question. You can reply with more detail or ask a maintainer." }),
+          });
+          if (!notice.ok) throw new Error(`Discord rejected the support notice (HTTP ${notice.status}).`);
+        }
+        if (triageMessageId) {
+          await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${triageMessageId}`, {
+            method: "DELETE", headers: { Authorization: `Bot ${botToken}` },
+          }).catch(() => {});
         }
       }
 

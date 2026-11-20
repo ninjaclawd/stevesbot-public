@@ -54,19 +54,23 @@ Copy an existing instruction file to `resources/instructions/product-support.md`
 
 ## 4. Add documentation and source repositories
 
-Clone only repositories the bot is allowed to read:
+For the supplied VDO.Ninja and Social Stream routes, clone the public product sources from `steveseguin` into the paths in the manifest. Run these commands from the bot checkout.
 
 ```bash
-git clone --depth 1 https://github.com/YOUR-ORG/YOUR-PRODUCT.git repos/product
+git clone --depth 1 --branch develop https://github.com/steveseguin/vdo.ninja.git repos/vdo-ninja
+git clone --depth 1 --branch main https://github.com/steveseguin/social_stream.git repos/social_stream
+git clone --depth 1 --branch main https://github.com/steveseguin/ssn_app.git repos/ssn_app
+npm run repo-sync
 ```
 
-Then add an entry to `resources/manifests/repos.yaml`:
+For your own product, clone the source under `repos/`. Then add an entry to `resources/manifests/repos.yaml`:
 
 ```yaml
 repos:
   - id: product
     owner: YOUR-ORG
     repo: YOUR-PRODUCT
+    branch: main
     localPath: repos/product
     summary: Documentation and source for the supported product.
     allowedPaths:
@@ -77,7 +81,7 @@ repos:
 
 The tool layer enforces this allow-list. Do not point it at your whole home directory.
 
-To keep clones current, use a scheduled job that runs `git -C repos/product pull --ff-only`. Use deployment keys or credentials with read-only repository access.
+Schedule the chore runner from the repository root so the daily repo-sync skill runs. Check `logs/repo-update.log` after the first scheduled refresh. Use deployment keys or credentials with read-only repository access.
 
 ## 5. Configure models
 
@@ -109,10 +113,11 @@ Keep `STEVESBOT_DRY_RUN=true` for the first run:
 npm run dev
 ```
 
-Post a test question. Confirm that it appears in the review workflow and is not sent publicly. Also test:
+Post a test question and inspect its workflow in the dashboard. Dry-run suppresses worker delivery. Discord intake can still display interactive prompts. Exercise the following cases in your private test server.
 
 - a normal support question;
 - a support question that `@mentions` the bot;
+- a reply to a bot answer with new diagnostic details;
 - an empty or joking mention, which should not force a reply;
 - a question with no supporting documentation;
 - provider failure, so fallback behavior is visible;

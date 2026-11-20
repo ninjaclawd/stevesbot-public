@@ -69,9 +69,10 @@ export type DiscordEventRecord = {
   /** Set when the user explicitly asks the bot for help; bypasses maintainer/human-handling guards. */
   userRequestedBotHelp?: boolean;
   /** Distinguishes a passive Discord mention from the repeatable Ask-the-Bot action. */
-  botHelpRequestSource?: "ask-button" | "mention";
+  botHelpRequestSource?: "ask-button" | "mention" | "reply";
   /** The triage prompt message ID — edited/removed when pipeline completes. */
   triageMessageId?: string;
+  referencedBotAnswer?: string;
 };
 
 export type ThreadContext = {

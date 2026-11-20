@@ -10,10 +10,6 @@ routes:
     instructionRef: resources/instructions/vdo-ninja-support.md
     repoScopes:
       - vdo-ninja
-      - comms-cam
-      - invite-cam
-      - game-capture
-      - ninja-obs-plugin
     enabled: false
   - id: social-stream-support
     guildId: "444444444444444444"
@@ -23,8 +19,6 @@ routes:
     repoScopes:
       - social-stream
       - ssn-app
-      - caption-ninja
-      - electron-capture
     enabled: false
   - id: vdo-ninja-bug-report
     guildId: "444444444444444444"
@@ -35,6 +29,4 @@ routes:
       - vdo-ninja
       - ssn-app
       - social-stream
-      - comms-cam
-      - invite-cam
     enabled: false

@@ -2,11 +2,10 @@
 
 # 🛟 StevesBot
 
-### Evidence-first Discord support, with a human still in charge
+### Discord support for people who ask
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Tests](https://img.shields.io/badge/tests-320%20passing-2ea44f)](#-development)
 [![License: MIT](https://img.shields.io/badge/license-MIT-f2c744)](LICENSE)
 [![Privacy](https://img.shields.io/badge/privacy-local--first-6f42c1)](docs/PRIVACY_AND_PUBLIC_EXPORT.md)
 
@@ -14,44 +13,29 @@
 
 </div>
 
-StevesBot is a Discord support assistant that researches a question, drafts a grounded answer, and lets a human review the draft before anything is posted.
-
-> [!IMPORTANT]
-> StevesBot does **not** secretly retrain an AI model on Discord users. Its memory is a local, inspectable collection of reviewed support records that you can correct or delete.
-
-## ✨ At a glance
-
-| Evidence first | Human in the loop | Local-first memory |
-| --- | --- | --- |
-| Searches approved answers, solved threads, documentation, and source code before drafting. | A reviewer can send, edit, or reject every proposed answer. | SQLite stores searchable support knowledge without changing the model itself. |
+In a configured support thread, **choose your platform in the bot’s help prompt** to ask it to research your question. You can also **@mention the bot with a support question** in an enabled channel. To continue, use Discord’s **Reply** on the bot’s answer. Tell it what you tried or what changed. You can skip the help prompt and keep talking with people in the thread.
 
 ## 🧭 How it works
 
-Think of it as a careful support clerk:
+People asking for help are the main audience. The bot reads the conversation, searches the permitted documentation, source code and local support knowledge, then checks its draft. A validated answer to an explicit request goes back to the source conversation. A follow-up uses the answer you replied to when Discord can retrieve it.
 
-1. It notices a message in an allowed Discord channel.
-2. It decides whether the message needs a reply.
-3. It looks through approved answers, solved threads, documentation, and source code.
-4. A capable model writes a draft from that evidence.
-5. A second pass checks the draft for unsupported claims.
-6. A human can send, edit, or reject the answer.
-7. Useful reviewed results become easier to find next time.
+Maintainers also get private draft suggestions for ordinary support traffic. They can choose which suggestions to send. Scheduled chores can surface critical issues and recurring trends for investigation.
 
 ```mermaid
 flowchart LR
-    A[Discord message] --> B{Allowed route?}
-    B -->|No| C[Ignore]
-    B -->|Yes| D[Triage]
-    D -->|Reply useful| E[Retrieve evidence]
-    D -->|No reply needed| C
-    E --> F[Draft answer]
-    F --> G[Validate claims]
-    G --> H[Human review]
-    H -->|Send or edit| I[Discord reply]
-    H -->|Reject| J[Feedback signal]
-    I --> K[Reviewed local memory]
-    J --> K
+    A[Help prompt, mention or reply] --> B[Research and validate]
+    B --> C[Answer in the source conversation]
+    C -->|User replies| B
+    D[Other support traffic] --> E[Triage]
+    E -->|Draft warranted| F[Private review]
+    F -->|Maintainer sends| C
 ```
+
+## What we learned from support
+
+Across one deployment, 120 distinct accounts made 196 search requests through the interactive help flow from March 16 through November 20, 2026. In the 30 days ending November 20, the support queue recorded 18 explicit requests from 11 identifiable accounts. Seventeen had a recorded answer in the source conversation. These measurements describe participation and delivery. Measuring resolution requires a user to confirm that a fix worked.
+
+Follow-ups need the exact preceding answer and the details the user has already supplied. A reviewer caught a draft that repeated a diagnostic question after the user had answered it. Timing needs similar care. Someone can ask the bot to research a thread hours after opening it, so measure from the help request when evaluating how long the bot took to respond.
 
 ## 🔓 What this public repository is
 
@@ -170,13 +154,13 @@ The runner uses an atomic PID lock, so a long-running job is not duplicated just
 
 Repository update chores operate only on clones you place under `repos/`. Keep those clones separate from this public repository and use read-only credentials whenever possible.
 
-The included `repo-sync` skill runs at 4:00 AM and uses `git pull --ff-only`; the changelog follows at 4:30 AM. A diverged or locally modified clone fails visibly instead of being reset or merged automatically. You can also run it with `npm run repo-sync`.
+The included `repo-sync` skill runs at 4:00 AM and validates configured GitHub remotes and branches, fetches changes and fast-forwards each checkout; the changelog follows at 4:30 AM. Missing checkouts, tracked edits and diverged branches produce a failed sync. You can also run it with `npm run repo-sync`.
 
 ## 🔐 Privacy and safety boundary
 
 - Routes are deny-by-default: sample routes are disabled.
 - Repository tools are read-only and restricted to configured scopes.
-- Human review remains between drafting and posting.
+- Model validation checks explicit answers. Maintainers control posting of passive draft suggestions.
 - Tokens belong only in `.env` or your secret manager.
 - User messages, transcripts, databases, logs, and attachments are local-only.
 - Public exports should be allow-list based, then scanned again before pushing.

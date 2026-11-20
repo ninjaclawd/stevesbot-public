@@ -1262,7 +1262,7 @@ export class SupportPipeline {
       const context = await this.transcriptStore.getContext(route, event);
       const instruction = await readFile(route.instructionRef, "utf8");
       let effectiveContext = context;
-      if (event.userRequestedBotHelp) {
+      if (event.userRequestedBotHelp && event.botHelpRequestSource !== "reply") {
         const focusMessage = pickExplicitBotHelpFocusMessage(context);
         if (focusMessage) {
           effectiveContext = {
@@ -1298,20 +1298,20 @@ export class SupportPipeline {
       // If the bot already replied in this thread, include it so the drafter
       // doesn't repeat itself and can build on the previous answer.
       let botPriorReplyContext = "";
-      try {
-        const threadKey = effectiveContext.firstMessage
-          ? route.id + ":" + (event.threadId ?? event.channelId)
-          : route.id + ":" + event.channelId;
+      if (event.botHelpRequestSource === "reply") {
+        if (event.referencedBotAnswer) {
+          botPriorReplyContext = "The user replied to this bot answer:\n" + event.referencedBotAnswer;
+        }
+      } else {
+        const threadKey = route.id + ":" + (event.threadId ?? event.channelId);
         const priorReply = this.db.getLastApprovedReply(threadKey);
         if (priorReply) {
           botPriorReplyContext = [
-            "YOUR PRIOR REPLY IN THIS THREAD (do not repeat this — build on it or refer back to it if relevant):",
+            "Prior approved draft in this conversation (delivery unconfirmed):",
             priorReply.replyText,
-            "(Posted at: " + priorReply.createdAt.slice(0, 16) + ")",
+            priorReply.createdAt.slice(0, 16),
           ].join("\n");
         }
-      } catch {
-        // Prior reply lookup is best-effort
       }
 
       // ── User memory context ──
@@ -1476,11 +1476,11 @@ export class SupportPipeline {
           action: "reply",
           botShouldSpeakNow: true,
           category: "user-requested-bot-help",
-          rationale: "User explicitly clicked 'Ask the Bot' button — overriding triage to reply.",
+          rationale: "User explicitly requested help — overriding triage to reply.",
           confidence: 0.99,
           humanAlreadyHandling: false,
         };
-        makeStep({ phase: "triage", label: "User-requested bot help override", status: "ok", startedAt: nowIso(), completedAt: nowIso(), durationMs: 0, outputText: "Forced reply: user clicked Ask the Bot." }, steps);
+        makeStep({ phase: "triage", label: "User-requested bot help override", status: "ok", startedAt: nowIso(), completedAt: nowIso(), durationMs: 0, outputText: "Forced reply: user requested help." }, steps);
       }
 
       makeStep(
@@ -1558,14 +1558,14 @@ export class SupportPipeline {
       const enableNoAnswer = process.env.STEVESBOT_ENABLE_NO_ANSWER !== "false";
       let toolUsageGuide = buildToolUsageGuide(route);
       if (enableClarify) {
-        toolUsageGuide += "\nclarify: Use to ask the user diagnostic or clarifying questions before answering. Args: { \"question\": \"your question to the user\" }. The question becomes the reply. USE THIS for quality/connection issues — ask about speedtest, WiFi/wired, hardware, and CTRL+click stats BEFORE suggesting fixes. Also use when the question is ambiguous. Prefer asking over guessing.";
+        toolUsageGuide += "\nclarify: Use to ask the user diagnostic or clarifying questions before answering. Args: { \"question\": \"your question to the user\" }. The question becomes the reply. Use diagnostic results the user already provided. For connection issues ask for the single most useful missing detail. Also use when the question is ambiguous. Prefer asking over guessing.";
       }
       if (enableNoAnswer) {
         toolUsageGuide += "\nnoAnswer: Use when you searched thoroughly but cannot find evidence. Args: { \"reason\": \"what you looked for\", \"searchedFor\": \"search terms used\" }. Produces an honest reply. ALWAYS prefer this over fabrication.";
       }
       const explicitBotHelpContext = event.userRequestedBotHelp
         ? [
-            "IMPORTANT OVERRIDE: The user explicitly clicked 'Ask the Bot'.",
+            "IMPORTANT OVERRIDE: The user explicitly requested help.",
             "Do not output a deferral like 'the maintainer is already handling this', 'no public reply needed', or similar stay-out language.",
             "You must do one of these instead: answer with evidence, ask a focused clarifying question via clarify, or use noAnswer honestly.",
           ].join("\n")

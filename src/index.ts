@@ -132,7 +132,7 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => shutdown("SIGINT"));
 
   if (roles.has("web")) {
-    const webHost = process.env.STEVESBOT_WEB_HOST ?? "0.0.0.0";
+    const webHost = process.env.STEVESBOT_WEB_HOST ?? "127.0.0.1";
     const webPort = Number(process.env.STEVESBOT_WEB_PORT ?? "8787");
     webServer = await startObservabilityServer(database, { host: webHost, port: webPort, discordToken: process.env.DISCORD_BOT_TOKEN });
     console.log(`Observability UI listening on http://${webHost}:${webPort}`);
@@ -228,17 +228,9 @@ async function main(): Promise<void> {
         const botToken = process.env.DISCORD_BOT_TOKEN ?? "";
         if (!botToken) return;
 
-        // Map product selection to route ID
-        const productRouteMap: Record<string, string> = {
-          "vdo-ninja": "vdo-ninja-support",
-          "social-stream": "social-stream-support",
-        };
-        const routeId = productRouteMap[state.product ?? ""] ?? "vdo-ninja-support";
-        const route = appConfig.routes.find((r) => r.id === routeId);
-        if (!route) {
-          console.error(`[TRIAGE-FLOW] No route found for product=${state.product} (routeId=${routeId})`);
-          return;
-        }
+        const route = appConfig.routes.find((candidate) => candidate.enabled && candidate.id === state.routeId);
+        if (!route) return;
+        const routeId = route.id;
 
         // Fetch the original trigger message from Discord to build a proper event
         if (state.triggerMessageId.startsWith("test-")) {
@@ -253,34 +245,22 @@ async function main(): Promise<void> {
           });
           if (resp.ok) {
             const m = await resp.json() as Record<string, unknown>;
-            if (m.id && m.content) return m;
-          }
-          // Fallback: fetch recent messages and look for user content
-          const fallback = await fetch(`https://discord.com/api/v10/channels/${state.channelId}/messages?limit=10`, {
-            headers: { Authorization: `Bot ${botToken}` },
-          });
-          if (!fallback.ok) return null;
-          const messages = await fallback.json() as Record<string, unknown>[];
-          // First try: find a non-bot message
-          const userMessages = messages
-            .filter((m) => !(m.author as Record<string, unknown>)?.bot && m.content)
-            .reverse();
-          if (userMessages[0]) return userMessages[0];
-          // Thread starter message lives in the parent channel — check referenced_message
-          // on bot welcome messages (NinjaBot replies to the thread starter)
-          for (const m of messages) {
-            const ref = m.referenced_message as Record<string, unknown> | undefined;
-            if (ref?.content && !(ref.author as Record<string, unknown>)?.bot) {
-              return ref;
-            }
+            const author = m.author as { id?: string; bot?: boolean } | undefined;
+            if (m.id === state.triggerMessageId && m.content && author?.id === state.userId && !author.bot) return m;
           }
           return null;
         };
 
         fetchTriggerMessage()
-          .then((m) => {
+          .then(async (m) => {
             if (!m) {
-              console.error("[TRIAGE-FLOW] Could not fetch any user message in channel:", state.channelId);
+              if (state.triageMessageId) {
+                await fetch(`https://discord.com/api/v10/channels/${state.channelId}/messages/${state.triageMessageId}`, {
+                  method: "PATCH",
+                  headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({ content: "I couldn't read your original question. Please mention me with your question.", components: [] }),
+                });
+              }
               return;
             }
 
@@ -288,7 +268,7 @@ async function main(): Promise<void> {
               guildId: (m.guild_id as string) ?? route.guildId,
               channelId: state.channelId,
               threadId: state.channelId !== route.channelId ? state.channelId : undefined,
-              messageId: m.id as string,
+              messageId: state.triageMessageId ? `${m.id}:bot-help:${state.triageMessageId}` : m.id as string,
               authorId: ((m.author as Record<string, string>)?.id) ?? state.userId,
               authorName: ((m.author as Record<string, string>)?.username) ?? "unknown",
               content: m.content as string,
@@ -297,6 +277,7 @@ async function main(): Promise<void> {
               triageProduct: state.product,
               triagePlatform: state.platform,
               userRequestedBotHelp: true,
+              botHelpRequestSource: "ask-button",
               triageMessageId: state.triageMessageId,
             };
             const result = database.enqueueWorkflowJob(routeId, event as import("./types.js").DiscordEventRecord);

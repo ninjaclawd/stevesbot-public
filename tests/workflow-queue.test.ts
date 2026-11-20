@@ -413,3 +413,32 @@ test("WorkflowQueueWorker skips publishing in dry-run mode", async () => {
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("direct replies deduplicate and record a failed Discord delivery", async (t) => {
+  const db = new AppDatabase(":memory:");
+  const event: DiscordEventRecord = { ...makeEvent("direct-reply"), userRequestedBotHelp: true, botHelpRequestSource: "reply" };
+  const queued = db.enqueueWorkflowJob(route.id, event);
+  const statuses: string[] = [];
+  const pipeline = {
+    handleEvent: async () => ({ posted: true, reply: "Answer", runId: 7 }),
+    recordDelivery: (_id: number, delivery: { status: string }) => statuses.push(delivery.status),
+  };
+  const savedToken = process.env.DISCORD_BOT_TOKEN;
+  process.env.DISCORD_BOT_TOKEN = "test";
+  t.after(() => {
+    if (savedToken === undefined) delete process.env.DISCORD_BOT_TOKEN;
+    else process.env.DISCORD_BOT_TOKEN = savedToken;
+  });
+  const send = t.mock.method(globalThis, "fetch", async () => new Response(null, { status: 403 }));
+  const worker = new WorkflowQueueWorker(makeConfig("."), db, pipeline as never, { publish: async () => assert.fail() });
+  assert.equal(await worker.processNextJob(), true);
+  assert.deepEqual(statuses, ["error"]);
+  assert.equal(db.getWorkflowJob(queued.jobId!)?.status, "failed");
+  assert.equal(db.enqueueWorkflowJob(route.id, event).inserted, false);
+
+  const dryWorker = new WorkflowQueueWorker(makeConfig("."), db, pipeline as never, { publish: async () => assert.fail() }, { dryRun: true });
+  db.enqueueWorkflowJob(route.id, { ...event, messageId: "dry-reply" });
+  const before = send.mock.callCount();
+  assert.equal(await dryWorker.processNextJob(), true);
+  assert.equal(send.mock.callCount(), before);
+});

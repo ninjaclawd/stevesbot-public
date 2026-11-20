@@ -149,7 +149,7 @@ export function isExplicitBotHelpMention(
   message: Pick<Message, "content" | "mentions">,
   botUserId: string | undefined,
 ): boolean {
-  if (!botUserId || !message.mentions.has(botUserId)) {
+  if (!botUserId || !message.mentions.users.has(botUserId)) {
     return false;
   }
 
@@ -162,6 +162,15 @@ export function isExplicitBotHelpMention(
   const hasSupportTopic = SUPPORT_TOPIC_PATTERN.test(requestText);
   const hasRequestLanguage = HELP_REQUEST_PATTERN.test(requestText);
   return (hasProblem && (hasRequestLanguage || hasSupportTopic)) || (hasSupportTopic && hasRequestLanguage);
+}
+
+export function directRequestSource(
+  message: Pick<Message, "mentions" | "reference" | "content">,
+  botId: string | undefined,
+): "reply" | "mention" | undefined {
+  if (botId && message.reference?.messageId && message.mentions.repliedUser?.id === botId) return "reply";
+  if (isExplicitBotHelpMention(message, botId)) return "mention";
+  return undefined;
 }
 
 /** Map route IDs to triage product IDs for auto-triage in known support channels */
@@ -254,6 +263,8 @@ export class DiscordBot {
     if (message.author.bot && message.guildId && message.mentions.has(this.client.user?.id ?? "")) {
       const match = message.content.match(/!start-triage\s+user=(\d+)(?:\s+trigger=(\d+))?/);
       if (match) {
+        const route = this.resolveRoute(message);
+        if (!route) return;
         const userId = match[1];
         const triggerMessageId = match[2] ?? message.id;
         const channelId = message.channelId;
@@ -281,7 +292,7 @@ export class DiscordBot {
           // Delete the command message to keep thread clean
           try { await message.delete(); } catch { /* may lack permission */ }
 
-          const result = await sendTriagePrompt(token, channelId, triggerMessageId, userId, preselectedProduct);
+          const result = await sendTriagePrompt(token, channelId, triggerMessageId, userId, preselectedProduct, route.id);
           if (result.error) {
             console.log(`[BOT-TRIAGE] Failed in ${channelId}: ${result.error}`);
           } else {
@@ -309,11 +320,12 @@ export class DiscordBot {
       return;
     }
 
+    const source = directRequestSource(message, this.client.user?.id);
     // If a maintainer posts in a channel with an active triage flow, silence the bot
     const channelId = message.channelId;
     if (
       (MAINTAINER_IDS.has(message.author.id) || MAINTAINER_NAMES.has(message.author.username.toLowerCase())) &&
-      getFlowState(channelId)
+      !source && getFlowState(channelId)
     ) {
       markMaintainerPresent(channelId);
     }
@@ -324,11 +336,15 @@ export class DiscordBot {
     }
 
     const event = toEvent(message);
-    const isMaintainer = MAINTAINER_IDS.has(message.author.id)
-      || MAINTAINER_NAMES.has(message.author.username.toLowerCase());
-    if (!isMaintainer && isExplicitBotHelpMention(message, this.client.user?.id)) {
+    if (source) {
       event.userRequestedBotHelp = true;
-      event.botHelpRequestSource = "mention";
+      event.botHelpRequestSource = source;
+      if (source === "reply") {
+        const previous = await message.fetchReference().catch(() => null);
+        if (previous && previous.author.id === this.client.user?.id && previous.channelId === message.channelId) {
+          event.referencedBotAnswer = previous.content;
+        }
+      }
     }
 
     await this.sink.enqueue(route, event);
@@ -368,7 +384,7 @@ export class DiscordBot {
     const token = this.client.token;
     if (!token) return;
 
-    const result = await sendTriagePrompt(token, thread.id, triggerMessageId, userId, preselectedProduct);
+    const result = await sendTriagePrompt(token, thread.id, triggerMessageId, userId, preselectedProduct, route.id);
     if (result.error) {
       console.log(`[AUTO-TRIAGE] Failed to send prompt in ${thread.id}: ${result.error}`);
     } else {
