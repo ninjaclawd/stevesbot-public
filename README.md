@@ -1,210 +1,63 @@
-<div align="center">
+# StevesBot
 
-# 🛟 StevesBot
+StevesBot answers Discord support questions using product source code, documentation, and past support cases. Users opt in by selecting their platform in a support thread’s help prompt or by mentioning the bot with a question. Use Discord’s **Reply** on its answer to continue the conversation with a test result, correction, or follow-up.
 
-### Discord support for people who ask
+A validated answer to an explicit request goes back to the source conversation. Other messages in enabled channels can produce private draft suggestions for a maintainer. Scheduled jobs can also alert maintainers to breaking changes or recurring support issues.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-f2c744)](LICENSE)
-[![Privacy](https://img.shields.io/badge/privacy-local--first-6f42c1)](docs/PRIVACY_AND_PUBLIC_EXPORT.md)
+## What does the bot search?
 
-[Quick start](#-quick-start) · [How it works](#-how-it-works) · [Knowledge and feedback](docs/KNOWLEDGE_AND_FEEDBACK.md) · [Setup guide](docs/SETUP_GUIDE.md) · [Privacy](docs/PRIVACY_AND_PUBLIC_EXPORT.md)
+**GitHub repositories are a primary source.** The host clones specific branches, and the drafter searches the files on disk. For example, on the sample Social Stream support route, a question about a chat provider can lead the drafter to search `sources/` in `steveseguin/social_stream`, open the matching file, and use its implementation to explain the behavior. A Git refresh makes changed lines available on the next file read. Issues and pull-request discussions do not come down with the checkout.
 
-</div>
-
-In a configured support thread, **choose your platform in the bot’s help prompt** to ask it to research your question. You can also **@mention the bot with a support question** in an enabled channel. To continue, use Discord’s **Reply** on the bot’s answer. Tell it what you tried or what changed. You can skip the help prompt and keep talking with people in the thread.
-
-## 🧭 How it works
-
-People asking for help are the main audience. The bot reads the conversation, searches the permitted documentation, source code and local support knowledge, then checks its draft. A validated answer to an explicit request goes back to the source conversation. A follow-up uses the answer you replied to when Discord can retrieve it.
-
-Maintainers also get private draft suggestions for ordinary support traffic. They can choose which suggestions to send. Scheduled chores can surface critical issues and recurring trends for investigation.
-
-```mermaid
-flowchart LR
-    A[Help prompt, mention or reply] --> B[Research and validate]
-    B --> C[Answer in the source conversation]
-    C -->|User replies| B
-    D[Other support traffic] --> E[Triage]
-    E -->|Draft warranted| F[Private review]
-    F -->|Maintainer sends| C
-```
-
-## What we learned from support
-
-Across one deployment, 120 distinct accounts made 196 search requests through the interactive help flow from March 16 through November 20, 2026. In the 30 days ending November 20, the support queue recorded 18 explicit requests from 11 identifiable accounts. Seventeen had a recorded answer in the source conversation. These measurements describe participation and delivery. Measuring resolution requires a user to confirm that a fix worked.
-
-Follow-ups need the exact preceding answer and the details the user has already supplied. A reviewer caught a draft that repeated a diagnostic question after the user had answered it. Timing needs similar care. Someone can ask the bot to research a thread hours after opening it, so measure from the help request when evaluating how long the bot took to respond.
-
-## 🔓 What this public repository is
-
-This is a sanitized, runnable reference implementation. It includes the bot, tests, scheduled maintenance skills, sample configuration, and empty data directories. It intentionally excludes real messages, account IDs, tokens, databases, logs, attachments, host addresses, private deployment notes, and local repository clones.
-
-> [!CAUTION]
-> All long numeric IDs in samples and tests are synthetic placeholders. Replace them with your own values, and never enable the sample routes unchanged.
-
-## 🧰 Main features
-
-- Discord intake for configured channels and forum threads
-- Helpful handling of support-relevant `@bot` mentions without forcing replies to jokes or empty mentions
-- Human review queue with “sent as-is,” “edited,” and “not sent” feedback
-- Read-only search across product repositories and documentation
-- Full-text search over approved support answers and mined thread summaries
-- Optional Discord history archive for locally controlled retrieval
-- Configurable OpenAI-compatible model endpoints and ordered fallbacks
-- Scheduled health, knowledge, trend, digest, and repository chores
-- SQLite storage and a local observability dashboard
-- Strict TypeScript and automated tests
-
-## 🧩 The pieces, in plain language
-
-| Part | What it does | Where it lives |
+| Evidence | Where it comes from | How the drafter gets it |
 | --- | --- | --- |
-| Discord intake | Receives allowed messages and attachments | `src/discord/` |
-| Support pipeline | Triage, research, drafting, and validation | `src/pipeline/` |
-| Read-only tools | Searches only approved folders and databases | `src/tools/` |
-| Local memory | Stores workflow history, reviewed answers, and feedback | `src/store/`, `data/sqlite/` |
-| Knowledge miner | Turns resolved threads into compact problem/solution records | `src/knowledge-base.ts`, `scripts/` |
-| Chore runner | Runs maintenance and learning jobs on schedules | `src/chore-runner.ts`, `skills/` |
-| Dashboard | Shows queue, health, and workflow details locally | `src/web/`, `dashboard/` |
+| Product code and docs | Local clones of `steveseguin/vdo.ninja` (`develop`), `steveseguin/social_stream` (`main`), and `steveseguin/ssn_app` (`main`) in the public sample | Literal, regex, symbol, and filename searches, followed by reads of matching files or line ranges. |
+| Current conversation | Incoming message, thread starter when available, recent transcript, and the bot answer referenced by a Discord reply when retrievable | Included in drafting context. Extracted screenshot text can also supply search terms. |
+| Mined support cases | Local problem statements, solutions, and keywords in `data/sqlite/knowledge.sqlite` | Searched automatically before drafting. The drafter can also call `searchKnowledgeBase`. This collection is shared across routes. |
+| Previous Q&A and raw history | `support_records` in `data/sqlite/stevesbot.sqlite` and archived messages in `data/sqlite/archive.sqlite` | `searchSupport` retrieves Q&A for the route. `searchDiscordHistory` retrieves matching conversations for the route. Incoming workflow events are archived on a best-effort basis. |
+| Operator material and web results | Local resource directories and optional Brave or Tavily search | Resource tools read configured directories. Web search requires `BRAVE_SEARCH_API_KEY` or `TAVILY_API_KEY`. |
 
-For a deeper but still beginner-friendly explanation, see [Knowledge and feedback](docs/KNOWLEDGE_AND_FEEDBACK.md).
+To add a product, clone its repository under `repos/`. Set its owner, repository, branch, checkout path, and readable files or directories in `repos.yaml`. Add that entry’s ID to the Discord route’s `repoScopes`. The general file tools have a separate configuration in `resource-map.yaml`. Review its `readableScopes` too. The sample includes both `repos/` and local support data. [Repository manifest](resources/manifests/repos.yaml) · [Discord routes](resources/manifests/discord.yaml) · [Resource map](resources/manifests/resource-map.yaml)
 
-## 🚀 Quick start
+## Does it use RAG?
 
-You need Node.js 20 or newer, npm, a Discord application, and at least one OpenAI-compatible model endpoint.
+**Yes.** StevesBot uses retrieval-augmented generation (RAG) in two places.
+
+1. **Before drafting**, the pipeline extracts search terms from the question and conversation. SQLite FTS5 retrieves up to three matching support cases, ranking by text relevance and recency. An in-memory TF-IDF index compares weighted word vectors using cosine similarity and can add up to two distinct cases. The pipeline puts their problem statements, solutions, and keywords into the model’s prompt.
+2. **During drafting**, the model can ask for more evidence. The worker executes read-only tools and returns their results to the model. For an exact setting or code path, the model can search a checkout and open the relevant lines. A separate model call reviews the draft before delivery. The dashboard records tool calls and review decisions so a maintainer can inspect what informed an answer. [Drafting pipeline](src/pipeline/support-pipeline.ts) · [Repository tools](src/tools/read-only-tools.ts)
+
+This design runs with SQLite, an in-process term index, and ordinary Git checkouts. It needs no embedding model or vector database. Literal search suits option names and error strings, and an operator can inspect the exact source revision. The weakness is vocabulary mismatch. TF-IDF depends on shared terms, so a paraphrase can miss a relevant case. FTS reads the current knowledge database. The TF-IDF index is built at startup, so restart the worker after a bulk import to refresh it. [Knowledge search](src/knowledge-base.ts) · [TF-IDF implementation](src/tfidf-search.ts)
+
+A fresh install ships with empty support databases. Repository research works once the clones are present. As the bot handles questions, model-approved Q&A becomes searchable even before a user confirms that a fix worked. Treat historical answers as leads and check version-sensitive claims against the product branch. [Knowledge and feedback](docs/KNOWLEDGE_AND_FEEDBACK.md)
+
+## Self-hosting
+
+Install Node.js 20+, npm, Git, and ripgrep (`rg`). The repository sync script also uses Bash and GNU `timeout`.
 
 ```bash
 git clone https://github.com/ninjaclawd/stevesbot-public.git
 cd stevesbot-public
-npm install
+npm ci
 cp .env.example .env
 ```
 
-### Configure it
-
-1. Put your Discord bot token and review-channel ID in `.env`.
-2. Put your own server/channel IDs in `resources/manifests/discord.yaml`.
-3. Set `enabled: true` only on routes you have checked.
-4. Configure the repositories the bot may read in `resources/manifests/repos.yaml`.
-5. Configure a primary model and any fallbacks in `.env`.
-6. Validate everything before connecting to Discord.
+1. Configure the Discord token, a private review channel, and the Message Content intent. Replace the sample guild and channel IDs and enable your test route.
+2. In `.env`, configure `LOCAL_QWEN_*` for routing and validation and `OPENCODE_*` for research and drafting. They use OpenAI-compatible chat endpoints. For Discord support and the dashboard alone, set `STEVESBOT_ROLE=intake,worker,web` to omit the optional peer-to-peer role.
+3. Clone the branches listed above at the manifest paths. Run `npm run repo-sync` to verify and refresh them. Start with `STEVESBOT_DRY_RUN=true` in a test server. This suppresses worker delivery while Discord intake can still display interactive prompts. [Clone commands and full setup](docs/SETUP_GUIDE.md) · [Environment template](.env.example)
 
 ```bash
-npm run validate-skills
-npx tsc --noEmit
+npm run build
 npm test
 npm run dev
 ```
 
-The bot creates its local SQLite files when it starts. Keep `.env`, `data/`, `logs/`, `repos/`, and attachments out of Git; the included `.gitignore` already does this.
+**Verify retrieval.** With the model endpoints and clones configured, run `npm run repo-smoke -- --trace` to inspect a repository lookup. To test the mined full-text index independently of Discord or a model, run `npx tsx src/knowledge-base.ts search "audio routing"`. For daily checkout refreshes, schedule `npx tsx scripts/run-chores.ts` from the project root every few minutes. The repo-sync skill is due at 04:00. Check `logs/repo-update.log` for missing clones, wrong branches, or failed updates.
 
-> [!TIP]
-> The [step-by-step setup guide](docs/SETUP_GUIDE.md) covers the Discord portal, permissions, model choices, a safe first dry run, chores, and troubleshooting.
+**Data handling.** Transcripts, databases, attachments, and logs stay out of Git. A hosted model can receive conversation text and retrieved excerpts during inference. Keep the dashboard private and set retention and backup policies for your installation. [Privacy and public exports](docs/PRIVACY_AND_PUBLIC_EXPORT.md)
 
-## 🧠 Model routing and cost control
+## Deployment observations
 
-The harness separates cheap classification work from the harder research-and-drafting work. The public defaults illustrate this order:
+From March 16 through November 20, 2026, one deployment recorded **196 interactive searches from 120 accounts**. In the 30 days ending November 20, it recorded 18 explicit requests from 11 identifiable accounts and 17 answers delivered to the source conversation. Delivery is measurable. Resolution requires confirmation from the user. One rejected draft repeated a diagnostic question the user had already answered, which is why the reply handler retrieves the specific bot answer the user selected.
 
-- Primary drafter: a higher-reasoning OpenCode-compatible model such as `glm-5.2`
-- Cloud fallback: lower-cost/free models such as `deepseek-v4-flash-free`
-- Optional coding-plan fallback: any Z.ai OpenAI-compatible endpoint you configure
-- Local fallback: one or more small local endpoints
+## License
 
-Model catalogs and plan limits change. Treat the names in `.env.example` as examples and verify what your provider currently offers.
-
-Small models are useful for routing, keyword extraction, and simple summaries. They should not be trusted to diagnose a difficult issue without evidence. The pipeline therefore gives the drafter read-only search tools and performs a validation pass before review.
-
-## 🔎 How knowledge retrieval works
-
-The bot searches from the most useful, reviewed material toward the rawest material:
-
-1. The current thread, so it understands the conversation.
-2. Approved support records, which are short reviewed question/answer pairs.
-3. Mined knowledge entries, which summarize resolved historical threads.
-4. Product documentation and repository source code.
-5. Optional archived Discord history when the curated sources are not enough.
-6. Optional web search, only when configured and allowed.
-
-Search results are evidence, not instructions. Discord text, archived text, repository content, and web pages are treated as untrusted input. The model is told not to invent sources or follow commands found inside that content.
-
-## 🔁 How the bot improves its own knowledge
-
-“Self-improvement” here means a review loop, not autonomous model training:
-
-- Approved drafts are saved as searchable support records.
-- Review buttons record whether a draft was used, edited, or skipped.
-- Explicit positive/negative feedback is attached to the workflow that produced the answer.
-- Scheduled miners summarize promising resolved threads into a separate knowledge database.
-- Quality chores find stale, duplicated, weak, or missing entries.
-- Generated reference documents must be reviewed and remain local unless you deliberately publish them.
-
-A rejected answer does not automatically become trusted knowledge. Raw private messages are not committed to this repository.
-
-## 🧹 Scheduled chores
-
-The files under `skills/` define jobs such as system health checks, repository changelogs, knowledge-gap reports, thread mining, daily digests, and weekly summaries. Run due chores manually with:
-
-```bash
-npx tsx scripts/run-chores.ts
-```
-
-The runner uses an atomic PID lock, so a long-running job is not duplicated just because a fixed timeout expired. In production, call it from cron or a systemd timer; each skill decides whether it is due.
-
-Repository update chores operate only on clones you place under `repos/`. Keep those clones separate from this public repository and use read-only credentials whenever possible.
-
-The included `repo-sync` skill runs at 4:00 AM and validates configured GitHub remotes and branches, fetches changes and fast-forwards each checkout; the changelog follows at 4:30 AM. Missing checkouts, tracked edits and diverged branches produce a failed sync. You can also run it with `npm run repo-sync`.
-
-## 🔐 Privacy and safety boundary
-
-- Routes are deny-by-default: sample routes are disabled.
-- Repository tools are read-only and restricted to configured scopes.
-- Model validation checks explicit answers. Maintainers control posting of passive draft suggestions.
-- Tokens belong only in `.env` or your secret manager.
-- User messages, transcripts, databases, logs, and attachments are local-only.
-- Public exports should be allow-list based, then scanned again before pushing.
-
-Read [Privacy and public exports](docs/PRIVACY_AND_PUBLIC_EXPORT.md) before publishing a fork or sample dataset.
-
-## 🗂️ Project layout
-
-```text
-src/                  runtime TypeScript
-tests/                automated tests
-scripts/              maintenance and development entry points
-skills/               declarative scheduled/on-demand capabilities
-resources/manifests/  Discord, repository, and resource allow-lists
-resources/instructions/route-specific support guidance
-data/                  local databases and transcripts (ignored)
-logs/                  local logs (ignored)
-repos/                 local read-only product clones (ignored)
-dashboard/             static dashboard assets
-```
-
-## ✅ Before production
-
-- Test in a private Discord server and keep routes disabled until verified.
-- Start with `STEVESBOT_DRY_RUN=true`.
-- Confirm that the review channel is private to trusted reviewers.
-- Use a dedicated bot account with only the permissions it needs.
-- Set retention rules for transcripts, attachments, and logs.
-- Back up databases securely, outside the public repository.
-- Review model-provider privacy terms before sending message content off-device.
-
-## 🧪 Development
-
-```bash
-npm run dev             # start with tsx
-npm run build           # compile to dist/
-npx tsc --noEmit        # strict type check without output
-npm test                # full test suite
-npm run validate-skills # validate skill manifests
-npm run repo-smoke      # check configured repository access
-```
-
-## 📄 License
-
-StevesBot is available under the [MIT License](LICENSE). You may use, copy, modify, and distribute it, including in commercial projects, as long as the copyright and license notice remain included.
-
-Third-party packages keep their own licenses; see `package-lock.json` for dependency metadata. In particular, `@vdoninja/sdk` is AGPL-3.0-only with an additional exception permitting an unmodified official SDK distribution to be linked into a larger work under different terms. StevesBot consumes the official npm package without modifying it; review the SDK's [`LICENSE-SDK-EXCEPTION`](https://github.com/steveseguin/ninjasdk/blob/main/LICENSE-SDK-EXCEPTION) before bundling or changing that dependency.
+StevesBot uses the [MIT License](LICENSE). The `@vdoninja/sdk` dependency has its own [license and linking exception](https://github.com/steveseguin/ninjasdk/blob/main/LICENSE-SDK-EXCEPTION).
